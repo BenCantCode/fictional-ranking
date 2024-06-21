@@ -34,8 +34,12 @@ class Source(ABC):
         pass
 
     @abstractmethod
-    def get_character_names(self) -> Iterable[str]:
+    def all_characters(self) -> Iterable[Character]:
         pass
 
-    def get_character_ids(self) -> Iterable[str]:
-        return (f"{self.SOURCE_ID}/{name}" for name in self.get_character_names())
+    def all_character_names(self) -> Iterable[str]:
+        for character in self.all_characters():
+            yield character.name
+
+    def all_character_ids(self) -> Iterable[str]:
+        return (f"{self.SOURCE_ID}/{name}" for name in self.all_character_names())

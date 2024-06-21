@@ -1,5 +1,17 @@
-from mediawiki import MediaWiki, WikiArticle, wikitext_transformer
-from wikitextparser import WikiText, parse
+from mediawiki import (
+    MediaWiki,
+    WikiArticle,
+    wikitext_transformer,
+    replace_templates,
+    Template,
+)
+from wikitextparser import WikiText, parse, Section
+from exceptions import ParseException
+import logging
+from typing import Iterable
+from character import Character
+
+logger = logging.getLogger(__name__)
 
 
 class MarvelWiki(MediaWiki):
@@ -47,16 +59,8 @@ class MarvelWiki(MediaWiki):
         "Category:Runaways (Earth-616)/Members",
     ]
 
-    def get_character_names(self):
-        for article in self.all_articles():
-            if article.title.endswith(" (Earth-616)") and len(article.content) > 10000:
-                if any(
-                    template
-                    for template in parse(article.content).templates
-                    if template.normal_name().replace("Marvel Database:", "").strip()
-                    == "Character Template"
-                ):
-                    yield article.title
+    def article_filter(self, article: WikiArticle):
+        return article.title.endswith(" (Earth-616)") and len(article.content) > 10000
 
     @wikitext_transformer
     def expand_membership(self, title: str, wikitext: WikiText):
@@ -69,7 +73,7 @@ class MarvelWiki(MediaWiki):
             wikitext.string.replace(
                 "{{m[|[Wanderers (Earth-616)|Wanderers]]}}", "{{m|Wanderers}}"
             )
-        infobox_template = next(
+        template = next(
             (
                 template
                 for template in wikitext.templates
@@ -86,29 +90,88 @@ class MarvelWiki(MediaWiki):
             ),
             None,
         )
-        if not infobox_template:
-            print(
-                [
-                    template.normal_name().replace("Marvel Database:", "").strip()
-                    for template in wikitext.templates
-                ]
-            )
-            print("No template:", title)
-            with open("error.txt", "w") as error:
-                error.write(wikitext.string)
-            return
+        if not template:
+            raise ParseException("No template included; cannot determine reality.")
         # TODO: Handle "Moira" edge cases (see https://marvel.fandom.com/wiki/Module:Reality)
-        reality = infobox_template.get_arg("Reality")
+        reality = template.get_arg("Reality")
         if reality:
             reality = reality.plain_text()
-        for template in wikitext.templates:
+
+        def member_to_text(template: Template):
             if template.normal_name() == "m":
-                group = template.arguments[0].plain_text()
-                template.string = f"[[Category:{group} ({reality}/Members)]]"
+                return template.arguments[0].plain_text()
+
+        replace_templates(wikitext, member_to_text)
 
     @wikitext_transformer
-    def expand_power(self, title: str, wikitext: WikiText):
-        for template in wikitext.templates:
-            if template.normal_name() == "Power Link":
-                power = template.arguments[0].plain_text()
-                template.string = f"[[{power}]]"
+    def expand_character_template(self, title: str, wikitext: WikiText):
+        template = next(
+            (
+                template
+                for template in wikitext.templates
+                if template.normal_name().replace("Marvel Database:", "").strip()
+                in ["Character Template"]
+            ),
+            None,
+        )
+        if not template:
+            logger.info(
+                "%s does not use a character template; are they really a character?"
+            )
+            return
+
+        arguments = dict(
+            (arg.name.strip(), arg.value.strip()) for arg in template.arguments
+        )
+
+        new_sections = []
+
+        def add_section(argument_name, header):
+            value = arguments.get(argument_name)
+            if value:
+                new_sections.append(f"{header}\n\n{value}")
+
+        add_section("Overview", "")
+        # TODO: Consider adding additional sections (see https://marvel.fandom.com/wiki/Marvel_Database:Character_Template) for full list
+        add_section("History", "==History==")
+        add_section("Personality", "==Personality==")
+        if (
+            "Powers" in arguments
+            or "Abilities" in arguments
+            or "Weaknesses" in arguments
+        ):
+            new_sections.append("==Attributes==")
+        add_section("Powers", "===Powers===")
+        add_section("Abilities", "===Abilities===")
+        add_section(
+            "AdditionalAttributes",
+            "===Additional Attributes===",  # TODO: Check if this header is correct.
+        )
+        if "Equipment" or "Transportation" in arguments or "Weapons" in arguments:
+            new_sections.append("==Paraphernalia==")
+        add_section("Equipment", "===Equipment===")
+        add_section("Transportation", "===Transportation===")
+        add_section("Weapons", "===Weapons===")
+        add_section("Notes", "==Notes==")
+
+        wikitext.string = "\n".join(new_sections)
+
+    @wikitext_transformer
+    def expand_links(self, title: str, wikitext: WikiText):
+        def link_replacer(template: Template):
+            if template.normal_name() in [
+                "cid",
+                "cis",
+                "cl",
+                "el",
+                "elt",
+                "eltd",
+                "ml",
+                "Power Link",
+                "sl",
+                "sld",
+                "vl",
+            ]:
+                return template.arguments[-1].value
+
+        replace_templates(wikitext, link_replacer)

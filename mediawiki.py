@@ -1,4 +1,4 @@
-from typing import Iterable
+from typing import Iterable, Callable
 from lxml.etree import iterparse, ElementBase
 from source import Source
 from urllib.request import urlretrieve, urlopen
@@ -9,7 +9,7 @@ from os.path import join, exists
 import pickle
 from character import Section, Character
 import wikitextparser as wtp
-from wikitextparser import Template, WikiText
+from wikitextparser import Template, WikiText, WikiLink
 import lzma
 import re
 import zstandard
@@ -17,6 +17,7 @@ import requests
 from py7zr import SevenZipFile
 from config import *
 from functools import wraps
+from exceptions import NotACharacterException
 
 NAMESPACE = "http://www.mediawiki.org/xml/export-0.11/"
 
@@ -55,9 +56,47 @@ def combine_subpages(depth, pages: list[WikiArticle | list]) -> str:
     return content
 
 
+# Used to determine transformer order.
+_transformer_count = 0
+
+
 def wikitext_transformer(method):
-    method._wikitext_transformer = True
+    global _transformer_count
+    method._wikitext_transformer = _transformer_count
+    _transformer_count += 1
     return method
+
+
+def replace_templates(wikitext: WikiText, replacer: Callable[[Template], str | None]):
+    index = 0
+    while True:
+        templates = wikitext.templates
+        if index >= len(templates):
+            break
+        template = templates[index]
+        replacement = replacer(template)
+        if replacement == None:
+            index += 1
+            continue
+        span = template.span
+        old_string = wikitext.string
+        wikitext.string = old_string[: span[0]] + replacement + old_string[span[1] :]
+
+
+def replace_wikilinks(wikitext: WikiText, replacer: Callable[[WikiLink], str | None]):
+    index = 0
+    while True:
+        wikilinks = wikitext.wikilinks
+        if index >= len(wikilinks):
+            break
+        wikilink = wikilinks[index]
+        replacement = replacer(wikilink)
+        if replacement == None:
+            index += 1
+            continue
+        span = wikilink.span
+        old_string = wikitext.string
+        wikitext.string = old_string[: span[0]] + replacement + old_string[span[1] :]
 
 
 class MediaWiki(Source):
@@ -81,8 +120,8 @@ class MediaWiki(Source):
         for name in dir(self):
             method = getattr(self, name)
             if hasattr(method, "_wikitext_transformer"):
-                print("found wikitext transformer")
                 self.wikitext_transformers.append(method)
+        self.wikitext_transformers.sort(key=lambda method: method._wikitext_transformer)
         super().__init__(download_path)
 
     def parse(self):
@@ -186,3 +225,26 @@ class MediaWiki(Source):
             self.extract_sections(character_name, content),
             self.SOURCE_ID,
         )
+
+    def article_filter(self, article: WikiArticle):
+        return True
+
+    def all_characters(self) -> Iterable[Character]:
+        for article in self.all_articles():
+            if self.article_filter(article):
+                try:
+                    yield Character(
+                        article.title,
+                        self.extract_sections(article.title, article.content),
+                        self.SOURCE_ID,
+                    )
+                except NotACharacterException:
+                    pass
+
+    @wikitext_transformer
+    def remove_images(self, title, wikitext: WikiText):
+        def image_remover(wikilink: WikiLink):
+            if wikilink.title.startswith("File:"):
+                return ""
+
+        replace_wikilinks(wikitext, image_remover)

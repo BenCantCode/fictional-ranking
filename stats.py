@@ -12,14 +12,19 @@ evaluator = Evaluator()
 
 manager.load_source("marvel")
 
-num = 0
-with open("marvel_names.txt", "w") as file:
-    for character in manager.all_characters():
-        file.write(character.name + "\n")
-        num += 1
+# num = 0
+# with open("marvel_names.txt", "w") as file:
+#     for character in manager.all_characters():
+#         file.write(character.name + "\n")
+#         num += 1
 
-print(num)
+# print(num)
 
+a = manager.get_character("marvel/Peter Parker (Earth-616)").full_text
+with open("peter.txt", "w") as file:
+    file.write(a)
+# print(a)
+# print(len(a))
 # a = manager.get_character(character_a)
 # b = manager.get_character(character_b)
 

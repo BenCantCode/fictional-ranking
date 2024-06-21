@@ -1,3 +1,4 @@
+from typing import Iterable
 from mediawiki import MediaWiki, WikiArticle, combine_subpages, wikitext_transformer
 from character import Character
 import wikitextparser as wtp
@@ -130,7 +131,7 @@ class OnePieceWiki(MediaWiki):
             )[1]
         wikitext.string = wikitext.string + combine_subpages(1, subpages)
 
-    def get_character_names(self):
+    def all_character_names(self):
         character_names = []
         for character_list in self.articles_starting_with(
             "List of Canon Characters/Names"
@@ -151,3 +152,7 @@ class OnePieceWiki(MediaWiki):
                     wtp.parse(row[1]).wikilinks[0].target.split("#")[0]
                 )
         return character_names
+
+    def all_characters(self) -> Iterable[Character]:
+        for character_name in self.all_character_names():
+            yield self.get_character(character_name)

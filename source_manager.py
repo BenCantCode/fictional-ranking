@@ -29,5 +29,5 @@ class SourceManager:
 
     def all_characters(self) -> Iterable[Character]:
         for source in self.sources.values():
-            for character_name in source.get_character_names():
+            for character_name in source.all_character_names():
                 yield source.get_character(character_name)
