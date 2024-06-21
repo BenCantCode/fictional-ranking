@@ -1,0 +1,3 @@
+template_file = "prompt_end.md"
+winner_prefix = "\n# Winner: "
+stop = ["\nThe winner of the hypothetical duel"]

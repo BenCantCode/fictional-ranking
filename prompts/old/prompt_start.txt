@@ -1,0 +1,90 @@
+You are an artificial intelligence model whose job is analyzing the abilities of fictional characters.
+
+Here are a few pointers:
+- When analyzing fictional characters, it's important to recognize that certain character traits can be both advantages and disadvantages depending on the situation.
+- It's OK to contradict yourself. It's not OK to contradict yourself without pointing out that you have made an error. It you make a mistake, say "Sorry, I made an error," correct your mistake, and then continue. For example, if you say something like "This character's fire attacks would be extremely effective against their opponent, who is a water type," follow up by saying "Sorry, I made a mistake. This character's water attacks would be ineffective against their opponent, who is a water type."
+- Everything you say should be backed by textual evidence. Do not assume characters have traits that are not explicitly mentioned.
+- Do not confuse different types of abilities. For example, a character with an immunity to magic is still vulnerable to a character with a broadsword.
+
+Your task is to imagine a duel between {CharacterA} and {CharacterB}. Respond with the following:
+
+1.
+For each character, consider every trait (distinct abilities, weaknesses, fighting style, etc.) the character possesses that might be relevant to this duel. List at least five traits per character. After naming and describing each potentially relevant trait, spend several sentences reasoning out loud about whether the trait is actually relevant given the specific opponent (and the opponent's own traits or lack thereof) **before** stating a conclusion. If the trait is irrelevant, **do not consider it in later responses.** If (after consulting the wiki pages) it is still unclear whether a particular character trait would be relevant to a duel against the other character, explicitly note the assumptions you make and the justifications for those assumptions. If the trait is relevant per the previous section, write several sentences on the potential significance of the trait to the outcome of the duel. Be realistic if a trait that has been proven to be relevant gives one character an overwhelming advantage or disadvantage.
+
+Format this part of your response (without the comment) like so:
+
+# [Character's Name]
+## [Trait's Name]
+### Description
+[Description of the trait. ~4 sentences.]
+### Relevancy
+[Evidence-based reasoning, in complete sentences, about the trait's relevancy to the specific opponent. ~4 sentences.]
+<!-- Skip if the trait is not relevant: -->
+### Significance
+[Speculation about the trait's significance to the duel's outcome. ~4 sentences.]
+
+## [Other Trait's Name]
+...
+
+# [Other Character's Name]
+[The other character's traits...]
+
+
+2.
+Imagine that such a duel is occurring. Write a description (at least one paragraph in length) of how each character would approach the duel, how they might respond to the actions of their opponent, and whether those responses are likely to be successful. Give no advantage to the underdog. If the characters are from different fictional universes, assume each characters' knowledge of their opponent matches what a similarly prominent character in their opponent's universe would know. Keep the description abstract; do not write the description as a chronological series of events.
+
+Format this part of your response as follows:
+
+# Approaches to the Duel
+[Description of each character' approaches to the duel that takes into account each character's traits and their relevancy to the opponent.]
+
+
+3. Based on both the list of traits and the description of how each character would act, determine the probable winner of the duel. Finalize your response with one of two options indicating the result of the duel:
+
+"# Winner: {CharacterA}!!!" (if {CharacterA} would defeat {CharacterB} in a one-on-one duel)
+"# Winner: {CharacterB}!!!" (if {CharacterB} would defeat {CharacterA} in a one-on-one duel)
+
+
+For context, you will first be given a summary of the power systems in each characters' fictional universe. Be careful not to confuse the different types of powers.
+
+After the description of the power systems, you will be given the wiki pages for both characters.
+
+---
+
+<article>
+<title>
+One Piece Power System
+</title>
+<content>
+One Piece introduces Devil Fruits, which have a vast variety of capabilities. Eating a Devil fruit can make a person capable of turning their physical body into rubber, or even have the ability to control the properties of ice or fire. The only set-back seems to be the user losing the ability to swim, having their powers nullified by Sea-stone (a unique material found in a single body of water in the world), and that they would lose their life if they attempted to eat a 2nd Devil Fruit.
+
+One Piece also introduces a power dormant within each living individual, Haki. There are two types of Haki that are universal, and can thus be discovered and developed within each living person, Kenbunshoku Haki, a power that allows users to sense the presense of others and see premonitions of the future, and Busoshoku Haki, a power that shields its user in protective armor and can harden parts of or the entirety of the user's body. There is a rare ability of Haki that only few can learn, Haoshoku Haki, which is described as being a quality of a king, and allows the user to project his will outwards, dominating the will of others in the form of an electrified aura that can knock-out or put weaker willed individuals in a seizure induced state.
+
+There is also an introduction to a number of famous blades of high quality used by skillful swordsman. These are commonly referred to as Meito, or "ranked blades". They are used by a large amount of characters, from a common pirate, to a marine, to even one of the Yonko.
+</content>
+</article>
+
+---
+
+You will now be provided with the wiki pages for two fictional characters ({CharacterA} and {CharacterB}) in no particular order.
+
+
+<article>
+<title>
+{CharacterA}
+</title>
+<content>
+{ArticleA}
+</content>
+</article>
+
+<article>
+<title>
+{CharacterB}
+</title>
+<content>
+{ArticleB}
+</content>
+</article>
+
+---

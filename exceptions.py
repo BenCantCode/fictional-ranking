@@ -1,0 +1,2 @@
+class InvalidResult(Exception):
+    pass

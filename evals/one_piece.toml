@@ -1,0 +1,107 @@
+requires = ["one_piece"]
+
+# Low/Neg Diff (should be indisputably correct)
+
+[["One Piece (LD)"]]
+winner = "one_piece/Charlotte Linlin"
+loser = "one_piece/Nefertari Vivi"
+
+[["One Piece (LD)"]]
+winner = "one_piece/Shanks"
+loser = "one_piece/Morgan"
+
+[["One Piece (LD)"]]
+winner = "one_piece/Monkey D. Garp"
+loser = "one_piece/Wapol"
+
+[["One Piece (LD)"]]
+winner = "one_piece/Trafalgar D. Water Law"
+loser = "one_piece/Demalo Black"
+
+[["One Piece (LD)"]]
+winner = "one_piece/Nico Robin"
+loser = "one_piece/Kaya"
+
+[["One Piece (LD)"]]
+winner = "one_piece/Bartholomew Kuma"
+loser = "one_piece/Nefertari Cobra"
+
+[["One Piece (LD)"]]
+winner = "one_piece/Portgas D. Ace"
+loser = "one_piece/Camie"
+
+[["One Piece (LD)"]]
+winner = "one_piece/Smoker"
+loser = "one_piece/Gaimon"
+
+[["One Piece (LD)"]]
+winner = "one_piece/Donquixote Doflamingo"
+loser = "one_piece/Makino"
+
+[["One Piece (LD)"]]
+winner = "one_piece/Catarina Devon"
+loser = "one_piece/Merry"
+
+[["One Piece (LD)"]]
+winner = "one_piece/Van Augur"
+loser = "one_piece/Charlos"
+
+[["One Piece (LD)"]]
+winner = "one_piece/Van Augur"
+loser = "one_piece/Charlos"
+
+[["One Piece (LD)"]]
+winner = "one_piece/Crocodile"
+loser = "one_piece/Toko"
+
+[["One Piece (LD)"]]
+winner = "one_piece/Rob Lucci"
+loser = "one_piece/Nezumi"
+
+[["One Piece (LD)"]]
+winner = "one_piece/Sakazuki"
+loser = "one_piece/Pappag"
+
+[["One Piece (LD)"]]
+winner = "one_piece/Yamato"
+loser = "one_piece/Piiman"
+
+[["One Piece (LD)"]]
+winner = "one_piece/Monkey D. Dragon"
+loser = "one_piece/Shimotsuki Yasuie"
+
+[["One Piece (LD)"]]
+winner = "one_piece/Koby"
+loser = "one_piece/Johnny"
+
+[["One Piece (LD)"]]
+winner = "one_piece/Silvers Rayleigh"
+loser = "one_piece/Outlook III"
+
+[["One Piece (LD)"]]
+winner = "one_piece/Dracule Mihawk"
+loser = "one_piece/Ripper"
+
+# Medium Diff
+
+[["One Piece (MD)"]]
+winner = "one_piece/Stussy"
+loser = "one_piece/Kuroobi"
+
+[["One Piece (MD)"]]
+winner = "one_piece/Kaidou"
+loser = "one_piece/Borsalino"
+
+[["One Piece (MD)"]]
+winner = "one_piece/Sakazuki"
+loser = "one_piece/Yamato"
+
+[["One Piece (MD)"]]
+winner = "one_piece/Kuzan"
+loser = "one_piece/Roronoa Zoro"
+
+# High Diff
+
+[["One Piece (HD)"]]
+winner = "one_piece/Yamato"
+loser = "one_piece/Jinbe"

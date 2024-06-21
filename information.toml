@@ -1,0 +1,56 @@
+[one_piece]
+name = "One Piece"
+type = "one_piece_wiki"
+# Adapted from https://vsbattles.fandom.com/wiki/One_Piece, authored by various contributors, CC-BY-SA
+explanation = """
+## Devil Fruits
+One Piece introduces Devil Fruits, which have a vast variety of capabilities. Eating a Devil fruit can make a person capable of turning their physical body into rubber, or even have the ability to control the properties of ice or fire. The only set-back seems to be the user losing the ability to swim, having their powers nullified by Sea-stone (a unique material found in a single body of water in the world), and that they would lose their life if they attempted to eat a 2nd Devil Fruit.
+
+## Haki
+One Piece also introduces a power dormant within each living individual, Haki. There are two types of Haki that are universal, and can thus be discovered and developed within each living person, Kenbunshoku Haki, a power that allows users to sense the presense of others and see premonitions of the future, and Busoshoku Haki, a power that shields its user in protective armor and can harden parts of or the entirety of the user's body. There is a rare ability of Haki that only few can learn, Haoshoku Haki, which is described as being a quality of a king, and allows the user to project his will outwards, dominating the will of others in the form of an electrified aura that can knock-out or put weaker willed individuals in a seizure induced state.
+
+## Blades
+There is also an introduction to a number of famous blades of high quality used by skillful swordsman. These are commonly referred to as Meito, or "ranked blades". They are used by a large amount of characters, from a common pirate, to a marine, to even one of the Yonko.
+"""
+
+[marvel]
+name = "Marvel"
+type = "mediawiki"
+explanation = """
+
+"""
+[[marvel.include]]
+required_tags = ""
+categories = [
+    # "Good" groups
+    "Category:Fantastic Four (Earth-616)/Members",
+    "Category:Avengers (Earth-616)/Members",
+    "Category:New Avengers (Earth-616)/Members",
+    "Category:X-Men (Earth-616)",
+    "Category:Guardians of the Galaxy (Earth-616)/Members",
+    "Category:House of Agon (Earth-616)/Members",
+    "Category:Runaways (Earth-616)/Members",
+    # "Bad" groups
+]
+articles = [
+    "Victor von Doom (Earth-616)",
+    "Max Eisenhardt (Earth-616)",
+    "En Sabah Nur (Earth-616)",
+    "Norman Osborn (Earth-616)",
+    "Otto Octavius (Earth-616)",
+    "Edward Brock (Earth-616)",
+    "Victor Creed (Earth-616)",
+    "Wilson Fisk (Earth-616)",
+    "Bullseye (Lester) (Earth-616)",
+    "Samuel Sterns (Earth-616)",
+    "Thanos (Earth-616)",
+    "Johann Shmidt (Earth-616)",
+    "Loki Laufeyson (Earth-616)",
+    "Galan (Earth-616)",
+    "Ultron (Earth-616)",
+    "Cain Marko (Earth-616)",
+    "William Baker (Earth-616)",
+    "Curtis Connors (Earth-616)",
+    "Emil Blonsky (Earth-616)",
+    "",
+]
