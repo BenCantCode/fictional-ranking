@@ -82,7 +82,11 @@ loser = "one_piece/Outlook III"
 winner = "one_piece/Dracule Mihawk"
 loser = "one_piece/Ripper"
 
-# Medium Diff
+[["One Piece (LD)"]]
+winner = "one_piece/Eustass Kid"
+loser = "one_piece/Portgas D. Ace"
+
+# Mid Diff
 
 [["One Piece (MD)"]]
 winner = "one_piece/Stussy"
@@ -100,8 +104,24 @@ loser = "one_piece/Yamato"
 winner = "one_piece/Kuzan"
 loser = "one_piece/Roronoa Zoro"
 
+[["One Piece (MD)"]]
+winner = "one_piece/Kuzan"
+loser = "one_piece/Sabo"
+
+[["One Piece (MD)"]]
+winner = "one_piece/Marco"
+loser = "one_piece/Charlotte Katakuri"
+
 # High Diff
 
 [["One Piece (HD)"]]
 winner = "one_piece/Yamato"
 loser = "one_piece/Jinbe"
+
+[["One Piece (HD)"]]
+winner = "one_piece/Monkey D. Luffy"
+loser = "one_piece/Sakazuki"
+
+[["One Piece (HD)"]]
+winner = "one_piece/Gol D. Roger"
+loser = "one_piece/Shanks"
