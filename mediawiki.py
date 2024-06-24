@@ -1,4 +1,6 @@
-from typing import Iterable, Callable
+from __future__ import annotations
+from datetime import datetime
+from typing import Iterable, Callable, TypeAlias, Union
 from lxml.etree import iterparse, ElementBase
 from source import Source
 from urllib.request import urlretrieve, urlopen
@@ -7,7 +9,7 @@ import tempfile
 import os
 from os.path import join, exists
 import pickle
-from character import Section, Character
+from character import CharacterId, Section, Character
 import wikitextparser as wtp
 from wikitextparser import Template, WikiText, WikiLink
 import lzma
@@ -18,14 +20,22 @@ from py7zr import SevenZipFile
 from config import *
 from functools import wraps
 from exceptions import NotACharacterException
+import time
+from dateutil.parser import parse as parsedate
 
 NAMESPACE = "http://www.mediawiki.org/xml/export-0.11/"
 
 
 class WikiArticle:
-    def __init__(self, el: ElementBase):
-        self.title = el.findtext(f"mw:title", namespaces={"mw": NAMESPACE})
-        text = el.findtext(f"mw:revision/mw:text", namespaces={"mw": NAMESPACE})
+    title: str
+    revision: datetime
+    content: str
+
+    def __init__(self, el: ElementBase, namespace=NAMESPACE):
+        namespaces = {"mw": namespace}
+        self.title = el.findtext(f"mw:title", namespaces)  # type: ignore
+        text = el.findtext(f"mw:revision/mw:text", namespaces)
+        self.revision = parsedate(el.findtext(f"mw:revision/mw:timestamp", namespaces))  # type: ignore
         if text:
             self.content = text
         else:
@@ -38,7 +48,10 @@ class WikiArticle:
         return f'(Article "{self.title}")'
 
 
-def combine_subpages(depth, pages: list[WikiArticle | list]) -> str:
+DeepPagesList: TypeAlias = list[Union[WikiArticle, "DeepPagesList"]]
+
+
+def combine_subpages(depth, pages: DeepPagesList) -> str:
     content = ""
     for el in pages:
         if isinstance(el, WikiArticle):
@@ -101,15 +114,15 @@ def replace_wikilinks(wikitext: WikiText, replacer: Callable[[WikiLink], str | N
 
 class MediaWiki(Source):
     # The URL of the dump
-    DUMP_URL: str = None
+    DUMP_URL: str
     # The format of the dump (if it's an archive, it will be extracted)
     DUMP_FORMAT: str = "xml"
 
-    API_URL: str = None
+    API_URL: str | None = None
 
     # 10-0: Chance (out of 10) that the information is relevant.
     # 0 means always omit.
-    SECTION_PRIORITY: dict[str, float] = []
+    SECTION_PRIORITY: dict[str, float] = {}
     DEFAULT_SECTION_PRIORITY = 2
 
     def __init__(self, download_path: str = DOWNLOADS_FOLDER):
@@ -138,17 +151,23 @@ class MediaWiki(Source):
         os.makedirs(self.path, exist_ok=True)
         print("Downloading", self.DUMP_URL)
         tmp_download_path = None
+        self.version = str(datetime.now())
         if self.DUMP_FORMAT == "xml":
             print("(streaming)")
-            extracted = requests.get(self.DUMP_URL, stream=True).raw
+            res = requests.get(self.DUMP_URL, stream=True)
+            extracted = res.raw
+            if "last-modified" in res.headers:
+                self.version = str(parsedate(res.headers["last-modified"]))
         else:
             tmp_download_path, http_message = urlretrieve(self.DUMP_URL)
+            if "last-modified" in http_message:
+                self.version = str(parsedate(http_message["last-modified"]))
             print("Downloaded!")
             if self.DUMP_FORMAT == "7z":
                 with SevenZipFile(tmp_download_path) as compressed:
-                    extracted = next(iter(compressed.readall().values()))
+                    extracted = next(iter(compressed.readall().values()))  # type: ignore
             else:
-                raise NotImplementedError(self.FORMAT)
+                raise NotImplementedError(self.DUMP_FORMAT)
         self.articles = {}
         elem: ElementBase
         print("Parsing...")
@@ -175,12 +194,22 @@ class MediaWiki(Source):
     def get_article(self, title) -> WikiArticle | None:
         return self.articles.get(title)
 
-    def get_pages_in_category(self, category_name: str):  # e.g. Category:abcd
+    def get_pages_in_category(
+        self, category_name: str
+    ) -> list[str]:  # e.g. Category:abcd
         """Gets the pages in each category from the MediaWiki API."""
         res = requests.get(
             f"{self.API_URL}?action=query&list=categorymembers&format=json&cmtype=page&cmtitle={quote_plus(category_name)}"
         )
-        return [member["title"] for member in res.json["query"]["categorymembers"]]
+        if res.ok:
+            try:
+                return [
+                    member["title"] for member in res.json["query"]["categorymembers"]  # type: ignore
+                ]
+            except:
+                raise ValueError("Malformed response.")
+        else:
+            raise ValueError("Category API request failed.")
 
     def articles_starting_with(self, title) -> Iterable[WikiArticle]:
         return (
@@ -193,21 +222,21 @@ class MediaWiki(Source):
         for transformer in self.wikitext_transformers:
             transformer(title, wikitext)
 
-    def extract_sections(self, title: str, content: str):
-        parsed = wtp.parse(content)
-        self.transform_wikitext(title, parsed)
+    def extract_sections(self, article: WikiArticle):
+        parsed = wtp.parse(article.content)
+        self.transform_wikitext(article.title, parsed)
         # Extract sections
         sections = []
         found_level = None
         found_priority = self.DEFAULT_SECTION_PRIORITY
         for section in parsed.get_sections(include_subsections=False):
             found = False
-            if section.title:
+            if section.title != None:
                 section.title = section.title.strip()
-                if section.title.lower() in self.SECTION_PRIORITY:
+                if section.title.lower() in self.SECTION_PRIORITY:  # type: ignore
                     found = True
                     found_level = section.level
-                    found_priority = self.SECTION_PRIORITY[section.title.lower()]
+                    found_priority = self.SECTION_PRIORITY[section.title.lower()]  # type: ignore
             if not found and found_level != None and section.level <= found_level:
                 found_level = None
                 found_priority = self.DEFAULT_SECTION_PRIORITY
@@ -218,13 +247,18 @@ class MediaWiki(Source):
         sections[0].priority = self.SECTION_PRIORITY["introduction"]
         return sections
 
-    def get_character(self, character_name: str) -> Character:
-        content = self.get_article(character_name).content
+    def character_from_article(self, article: WikiArticle) -> Character:
         return Character(
-            character_name,
-            self.extract_sections(character_name, content),
-            self.SOURCE_ID,
+            CharacterId(self.SOURCE_ID, article.title),
+            str(article.revision),
+            self.extract_sections(article),
         )
+
+    def get_character(self, character_name: str) -> Character:
+        article = self.get_article(character_name)
+        if article == None:
+            raise NotACharacterException(character_name)
+        return self.character_from_article(article)
 
     def article_filter(self, article: WikiArticle):
         return True
@@ -233,11 +267,7 @@ class MediaWiki(Source):
         for article in self.all_articles():
             if self.article_filter(article):
                 try:
-                    yield Character(
-                        article.title,
-                        self.extract_sections(article.title, article.content),
-                        self.SOURCE_ID,
-                    )
+                    yield self.character_from_article(article)
                 except NotACharacterException:
                     pass
 

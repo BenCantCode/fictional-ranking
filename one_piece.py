@@ -1,5 +1,11 @@
 from typing import Iterable
-from mediawiki import MediaWiki, WikiArticle, combine_subpages, wikitext_transformer
+from mediawiki import (
+    MediaWiki,
+    WikiArticle,
+    combine_subpages,
+    wikitext_transformer,
+    DeepPagesList,
+)
 from character import Character
 import wikitextparser as wtp
 from wikitextparser import Template, WikiText
@@ -58,7 +64,7 @@ class OnePieceWiki(MediaWiki):
 
     # Extract relevant pages from a tab template
     # Only used on the Wiki page for Monkey D. Luffy
-    def pages_from_tabs(self, tabs: Template):
+    def pages_from_tabs(self, tabs: Template) -> tuple[str, list[WikiArticle]]:
         pages = []
         root = next(
             (arg.value.strip() for arg in tabs.arguments if arg.name.strip() == "root"),
@@ -106,7 +112,7 @@ class OnePieceWiki(MediaWiki):
         character_name = tabs_template_used.normal_name()[: -len(" Tabs Top")]
         tab_template = self.get_article(
             f"Template:{tabs_template_used.normal_name()}"
-        ).content
+        ).content  # type: ignore
         parsed_tab_template = wtp.parse(tab_template)
         if any(
             template
@@ -117,21 +123,21 @@ class OnePieceWiki(MediaWiki):
                 page
                 for page in (
                     self.get_article(f"{character_name}/{suffix}")
-                    for suffix in self.DEFAULT_TAB_SUBPAGES
+                    for suffix in DEFAULT_TAB_SUBPAGES
                 )
                 if page != None
             ]
         else:
-            subpages = self.pages_from_tabs(
+            subpages: list[WikiArticle] = self.pages_from_tabs(
                 next(
                     template
                     for template in parsed_tab_template.templates
                     if template.normal_name() == "Tabs"
                 ),
             )[1]
-        wikitext.string = wikitext.string + combine_subpages(1, subpages)
+        wikitext.string = wikitext.string + combine_subpages(1, subpages)  # type: ignore
 
-    def all_character_names(self):
+    def all_character_names(self) -> Iterable[str]:
         character_names = []
         for character_list in self.articles_starting_with(
             "List of Canon Characters/Names"

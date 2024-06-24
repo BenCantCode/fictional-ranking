@@ -1,3 +1,6 @@
+id = "default"    # Change this if you change the file at all; it could make debugging easier.
+version = "0.0.1"
+
 [one_piece]
 name = "One Piece"
 type = "one_piece_wiki"

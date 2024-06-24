@@ -1,16 +1,21 @@
 from abc import ABC, abstractmethod
 from os.path import exists, join
 from os import makedirs
-from character import Character
-from typing import Iterable
-from config import *
+from character import Character, CharacterId
+from typing import Iterable, TYPE_CHECKING
+from config import DOWNLOADS_FOLDER
 
 
 class Source(ABC):
-    @property
-    @abstractmethod
-    def SOURCE_ID():
-        pass
+    SOURCE_ID: str
+    version: str | None = None
+
+    if not TYPE_CHECKING:
+
+        @property
+        @abstractmethod
+        def SOURCE_ID():
+            pass
 
     def __init__(self, downloads_folder: str = DOWNLOADS_FOLDER):
         self.path = join(downloads_folder, self.SOURCE_ID)
@@ -39,7 +44,8 @@ class Source(ABC):
 
     def all_character_names(self) -> Iterable[str]:
         for character in self.all_characters():
-            yield character.name
+            yield character.id.name
 
-    def all_character_ids(self) -> Iterable[str]:
-        return (f"{self.SOURCE_ID}/{name}" for name in self.all_character_names())
+    def all_character_ids(self) -> Iterable[CharacterId]:
+        for character in self.all_characters():
+            yield character.id

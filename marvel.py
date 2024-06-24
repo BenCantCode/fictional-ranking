@@ -38,29 +38,26 @@ class MarvelWiki(MediaWiki):
         "links and references": 0,
     }
 
-    INCLUDE_CATEGORIES = [
-        "Category:Multiverse/Characters",
-        "Category:Fantastic Four (Earth-616)/Members",
-        "Category:Avengers (Earth-616)/Members",
-        "Category:New Avengers (Earth-616)/Members",
-        "Category:X-Men (Earth-616)",
-        "Category:Guardians of the Galaxy (Earth-616)/Members",
-        "Category:House of Agon (Earth-616)/Members",
-        "Category:Runaways (Earth-616)/Members",
-    ]
+    # INCLUDE_CATEGORIES = [
+    #     "Category:Multiverse/Characters",
+    #     "Category:Fantastic Four (Earth-616)/Members",
+    #     "Category:Avengers (Earth-616)/Members",
+    #     "Category:New Avengers (Earth-616)/Members",
+    #     "Category:X-Men (Earth-616)",
+    #     "Category:Guardians of the Galaxy (Earth-616)/Members",
+    #     "Category:House of Agon (Earth-616)/Members",
+    #     "Category:Runaways (Earth-616)/Members",
+    # ]
 
-    INCLUDE_CHARACTERS = [
-        "Category:Fantastic Four (Earth-616)/Members",
-        "Category:Avengers (Earth-616)/Members",
-        "Category:New Avengers (Earth-616)/Members",
-        "Category:X-Men (Earth-616)",
-        "Category:Guardians of the Galaxy (Earth-616)/Members",
-        "Category:House of Agon (Earth-616)/Members",
-        "Category:Runaways (Earth-616)/Members",
-    ]
-
-    def article_filter(self, article: WikiArticle):
-        return article.title.endswith(" (Earth-616)") and len(article.content) > 10000
+    # INCLUDE_CHARACTERS = [
+    #     "Category:Fantastic Four (Earth-616)/Members",
+    #     "Category:Avengers (Earth-616)/Members",
+    #     "Category:New Avengers (Earth-616)/Members",
+    #     "Category:X-Men (Earth-616)",
+    #     "Category:Guardians of the Galaxy (Earth-616)/Members",
+    #     "Category:House of Agon (Earth-616)/Members",
+    #     "Category:Runaways (Earth-616)/Members",
+    # ]
 
     @wikitext_transformer
     def expand_membership(self, title: str, wikitext: WikiText):

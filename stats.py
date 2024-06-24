@@ -2,33 +2,30 @@ from config import *
 from evaluate import Evaluator
 from source_manager import SourceManager
 import logging
-from character import Character
+from character import CharacterId
+from run import Run
+from generator import Generator
+from character_filter import SourceFilter, CharacterIdFilter
+from match_filter import InvertFilter, DuplicateMatchInRunFilter
+from matchmaking import PowermatchingMatchmaker, RandomMatchmaker
+from db import RunsDatabase
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("LiteLLM").setLevel(logging.WARNING)
 
-manager = SourceManager()
+source_manager = SourceManager()
 evaluator = Evaluator()
-
-manager.load_source("marvel")
-
-# num = 0
-# with open("marvel_names.txt", "w") as file:
-#     for character in manager.all_characters():
-#         file.write(character.name + "\n")
-#         num += 1
-
-# print(num)
-
-a = manager.get_character("marvel/Peter Parker (Earth-616)").full_text
-with open("peter.txt", "w") as file:
-    file.write(a)
-# print(a)
-# print(len(a))
-# a = manager.get_character(character_a)
-# b = manager.get_character(character_b)
-
-# result: Character = evaluator.evaluate(a, b)
-# print("Winner:", result.name)
-
-# print(result)
+character_filter = CharacterIdFilter(
+    [
+        CharacterId("one_piece", "Roronoa Zoro"),
+        CharacterId("Peter Parker", "(Earth-616)"),
+    ]
+)
+match_filter = InvertFilter(DuplicateMatchInRunFilter())
+matchmaker = RandomMatchmaker()
+generator = Generator(
+    character_filter, match_filter, matchmaker, source_manager.source_versions
+)
+db = RunsDatabase()
+run = Run("first_run", generator, evaluator, db)
+results = run.run(source_manager)

@@ -3,9 +3,10 @@ from config import *
 from character import Character
 import toml
 from exceptions import *
-from litellm import completion, completion_cost
+from litellm import completion, completion_cost, ModelResponse, Choices
 from os.path import join
 import logging
+from typing import cast, TYPE_CHECKING
 
 logger = logging.getLogger(__name__)
 
@@ -14,13 +15,19 @@ class Evaluator:
     def __init__(
         self,
         prompt: str = PROMPT,
-        template: str = None,
-        winner_prefix: str = None,
+        template: str | None = None,
+        winner_prefix: str | None = None,
         template_folder: str = PROMPTS_FOLDER,
         stop: list[str] = [],
-        information: dict = None,
+        information: dict | None = None,
         information_file: str = INFORMATION_FILE,
     ):
+        prompt_id = None
+        prompt_version = None
+        information_id = None
+        information_version = None
+        using_prompt_file = not bool(template)
+        using_informaton_file = not bool(information)
         env = Environment(loader=FileSystemLoader(template_folder), autoescape=False)
         if template:
             self.template = env.from_string(template)
@@ -30,15 +37,25 @@ class Evaluator:
             self.stop = stop
         else:
             with open(join(template_folder, prompt), "r") as file:
-                prompt = toml.load(file)
-                self.template = env.get_template(prompt["template_file"])
-                self.winner_prefix = prompt["winner_prefix"]
-                self.stop = prompt["stop"]
-        if information:
-            self.information = information
-        else:
+                prompt_meta = toml.load(file)
+                self.template = env.get_template(prompt_meta["template_file"])
+                prompt_id = prompt_meta["id"]
+                prompt_version = prompt_meta["version"]
+                self.winner_prefix = prompt_meta["winner_prefix"]
+                self.stop = prompt_meta["stop"]
+        if not information:
             with open(information_file, "r") as file:
-                self.information = toml.load(file)
+                information = toml.load(file)
+        information_id = information["id"]  # type: ignore
+        information_version = information["version"]  # type: ignore
+        self.information = information
+        self.object = {
+            "prompt": {"id": prompt_id, "version": prompt_version},
+            "information": {"id": information_id, "version": information_version},
+        }
+
+    def to_object(self):
+        return self.object
 
     def format(
         self,
@@ -46,19 +63,15 @@ class Evaluator:
         character_b: Character,
         model: str = MODEL,
         max_characters: int = MAX_CHARACTERS,
-        max_tokens: int = MAX_TOKENS,
-        max_cost: float = MAX_COST,
+        max_tokens: int | None = MAX_TOKENS,
+        max_cost: float | None = MAX_COST,
     ) -> str:
-        if character_a.source == character_b.source:
+        if character_a.id.source_id == character_b.source_id:
             character_a_name = character_a.name
             character_b_name = character_b.name
         else:
-            character_a_name = (
-                f"{character_a.name} ({self.information[character_a.source]['name']})"
-            )
-            character_b_name = (
-                f"{character_b.name} ({self.information[character_b.source]['name']})"
-            )
+            character_a_name = f"{character_a.name} ({self.information[character_a.source_id]['name']})"
+            character_b_name = f"{character_b.name} ({self.information[character_b.source_id]['name']})"
 
         character_a_description = character_a.abridged_text(
             model, max_characters, max_tokens, max_cost
@@ -72,33 +85,29 @@ class Evaluator:
                     "name": character_a_name,
                     "description": character_a_description,
                 },
-                "franchise_a": self.information[character_a.source],
+                "franchise_a": self.information[character_a.source_id],
                 "character_b": {
                     "name": character_b_name,
                     "description": character_b_description,
                 },
-                "franchise_b": self.information[character_b.source],
+                "franchise_b": self.information[character_b.source_id],
             }
         )
 
     def parse_result(
         self, response: str, character_a: Character, character_b: Character
-    ) -> Character | None:
+    ) -> Character:
         winner_index = response.find(self.winner_prefix) + len(self.winner_prefix)
         winner_raw = response[winner_index:]
         winner_raw = winner_raw.split("\n")[0]
         if not winner_raw:
             raise InvalidResult("No winner found.")
-        if character_a.source == character_b.source:
+        if character_a.source_id == character_b.source_id:
             expected_a = character_a.name
             expected_b = character_b.name
         else:
-            expected_a = (
-                f"{character_a.name} ({self.information[character_a.source]['name']})"
-            )
-            expected_b = (
-                f"{character_b.name} ({self.information[character_b.source]['name']})"
-            )
+            expected_a = f"{character_a.name} ({self.information[character_a.source_id]['name']})"
+            expected_b = f"{character_b.name} ({self.information[character_b.source_id]['name']})"
         # If the names match exactly, use them
         if winner_raw == expected_a:
             return character_a
@@ -121,8 +130,8 @@ class Evaluator:
         model: str = MODEL,
         completion_args: dict = COMPLETION_ARGS,
         max_characters: int = MAX_CHARACTERS,
-        max_tokens: int = MAX_TOKENS,
-        max_cost: float = MAX_COST,
+        max_tokens: int | None = MAX_TOKENS,
+        max_cost: float | None = MAX_COST,
         debug_dump: bool = DEBUG_DUMP,
         debug_folder: str = DEBUG_FOLDER,
     ) -> tuple[Character, Character]:
@@ -146,12 +155,16 @@ class Evaluator:
                 },
             ],
             stop=self.stop,
+            stream=False,
             **completion_args,
         )
-        res_text = res.choices[0].message.content
+        res_text: str | None = res.choices[0].message.content  # type: ignore
         if debug_dump:
             with open(join(debug_folder, "last_response.txt"), "w") as file:
-                file.write(res_text)
+                file.write(res_text or "")
+        if res_text == None:
+            logger.info(f"No result for %s vs. %s", character_a.id, character_b.id)
+            raise InvalidResult("Response is empty.")
         winner = self.parse_result(res_text, character_a, character_b)
         loser = character_a if character_b == winner else character_b
         logger.info(f"W: %s, L: %s", winner.id, loser.id)

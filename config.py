@@ -1,6 +1,11 @@
 import litellm
 from os.path import join, dirname
 from dotenv import load_dotenv
+from character_filter import CharacterFilterTypeRegistrar
+from match_filter import MatchFilterTypeRegistrar
+from matchmaking import MatchmakerTypeRegistrar
+
+VERSION = "0.0.1"
 
 load_dotenv()
 
@@ -19,6 +24,9 @@ EVALS_FOLDER = join(PROJECT_ROOT, "evals")
 # Information file
 INFORMATION_FILE = join(PROJECT_ROOT, "information.toml")
 
+# Database file (used for in-progress runs)
+DB_PATH = join(PROJECT_ROOT, "runs.sqlite")
+
 # Per-character limits
 MAX_CHARACTERS = 100000
 MAX_TOKENS = None
@@ -35,3 +43,7 @@ COMPLETION_ARGS = {
     # The temperature. A lower temperature value generally results in less creative responses.
     "temperature": 0,
 }
+
+CHARACTER_FILTER_TYPE_REGISTRAR = CharacterFilterTypeRegistrar()
+MATCH_FILTER_TYPE_REGISTRAR = MatchFilterTypeRegistrar()
+MATCHMAKER_TYPE_REGISTRAR = MatchmakerTypeRegistrar()
