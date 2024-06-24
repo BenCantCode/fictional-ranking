@@ -6,7 +6,12 @@ from character import CharacterId
 from run import Run
 from generator import Generator
 from character_filter import SourceFilter, CharacterIdFilter
-from match_filter import InvertFilter, DuplicateMatchInRunFilter
+from match_filter import (
+    InvertFilter,
+    DuplicateMatchInRunFilter,
+    AndFilter,
+    SelfMatchFilter,
+)
 from matchmaking import PowermatchingMatchmaker, RandomMatchmaker
 from db import RunsDatabase
 
@@ -22,7 +27,7 @@ character_filter = CharacterIdFilter(
         CharacterId("one_piece", "Marshall D. Teach"),
     ]
 )
-match_filter = InvertFilter(DuplicateMatchInRunFilter())
+match_filter = ~SelfMatchFilter() & ~DuplicateMatchInRunFilter()
 matchmaker = RandomMatchmaker()
 generator = Generator(
     character_filter, match_filter, matchmaker, source_manager.source_versions
@@ -30,3 +35,4 @@ generator = Generator(
 db = RunsDatabase()
 run = Run("first_run", generator, evaluator, db)
 results = run.run(source_manager)
+print(results)

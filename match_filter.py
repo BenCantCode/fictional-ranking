@@ -45,6 +45,16 @@ class MatchFilter(Type):
         """Instantiate a filter from a JSON-deserialized object. Don't override this."""
         return registrar.get_type(object["type"]).from_parameters(object, registrar)
 
+    # Shims for type checker
+    def __and__(self, other):
+        raise NotImplementedError()
+
+    def __or__(self, other):
+        raise NotImplementedError()
+
+    def __invert__(self):
+        raise NotImplementedError()
+
 
 class OrFilter(MatchFilter):
     TYPE_ID = "or"
@@ -107,7 +117,7 @@ class AndFilter(MatchFilter):
         for subfilter in self.subfilters:
             if not subfilter.ok(match, matches):
                 return False
-        return False
+        return True
 
 
 class InvertFilter(MatchFilter):
@@ -254,6 +264,24 @@ class DuplicateMatchInPriorRunFilter(MatchFilter):
         if self.order_dependent and (match[1], match[0]) in self.prior_matches:
             return True
         return False
+
+
+class SelfMatchFilter(MatchFilter):
+    TYPE_ID = "self"
+
+    @property
+    def parameters(self):
+        return {}
+
+    def from_parameters(self) -> SelfMatchFilter:
+        return SelfMatchFilter()
+
+    def ok(
+        self,
+        potential_match: tuple[CharacterId, CharacterId],
+        matches: list[PreparedMatch],
+    ):
+        return potential_match[0] == potential_match[1]
 
 
 class MatchFilterTypeRegistrar(TypeRegistrar[MatchFilter]):

@@ -83,9 +83,9 @@ class AndFilter(CharacterFilter):
 
     def ok(self, character_id: CharacterId, source_manager: SourceManager):
         for subfilter in self.subfilters:
-            if subfilter.ok(character_id, source_manager):
-                return True
-        return False
+            if not subfilter.ok(character_id, source_manager):
+                return False
+        return True
 
     @property
     def parameters(self) -> dict[str, Any]:

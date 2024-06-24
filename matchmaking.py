@@ -62,11 +62,17 @@ class RandomMatchmaker(Matchmaker):
     ) -> Iterable[tuple[CharacterId, CharacterId]]:
         random = Random(self.seed)
         for character_id in character_ids:
+            possible_opponent_ids = character_ids.copy()
             while True:
-                opponent_id = character_ids[random.randint(0, len(character_ids) - 1)]
+                opponent_id = possible_opponent_ids[
+                    random.randint(0, len(possible_opponent_ids) - 1)
+                ]
                 match = (character_id, opponent_id)
                 if filter.ok(match, matches):
                     yield match
+                    break
+                possible_opponent_ids.remove(opponent_id)
+                if len(possible_opponent_ids) == 0:
                     break
 
     @staticmethod
@@ -98,7 +104,6 @@ class PowermatchingMatchmaker(Matchmaker):
                 character_ids,
                 key=lambda opponent_id: abs(rating - self.ratings[opponent_id]),
             )
-            distances.remove(character_id)
             for opponent_id in distances:
                 match = (character_id, opponent_id)
                 if filter.ok(match, matches):
