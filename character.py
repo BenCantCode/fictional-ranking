@@ -11,6 +11,19 @@ class CharacterId:
     def __str__(self):
         return f"{self.source_id}/{self.name}"
 
+    def __hash__(self):
+        return hash(str(self))
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, str):
+            return str(self) == other
+        elif isinstance(other, CharacterId):
+            return self.source_id == other.source_id and self.name == other.name
+        elif isinstance(other, Character):
+            return other.id == self
+        else:
+            return False
+
 
 class Section:
     def __init__(self, text: str, priority: float):

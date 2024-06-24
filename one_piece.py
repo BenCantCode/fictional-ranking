@@ -101,11 +101,13 @@ class OnePieceWiki(MediaWiki):
 
     @wikitext_transformer
     def expand_character_tabs(self, title: str, wikitext: WikiText):
-        print("Expanding tabs...")
         tabs_template_used = next(
-            template
-            for template in wikitext.templates
-            if template.normal_name().endswith(" Tabs Top")
+            (
+                template
+                for template in wikitext.templates
+                if template.normal_name().endswith(" Tabs Top")
+            ),
+            None,
         )
         if not tabs_template_used:
             return

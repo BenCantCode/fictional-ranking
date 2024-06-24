@@ -47,5 +47,5 @@ class Source(ABC):
             yield character.id.name
 
     def all_character_ids(self) -> Iterable[CharacterId]:
-        for character in self.all_characters():
-            yield character.id
+        for character_name in self.all_character_names():
+            yield CharacterId(self.SOURCE_ID, character_name)

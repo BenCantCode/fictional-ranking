@@ -165,7 +165,7 @@ class CharacterIdFilter(CharacterFilter):
 
     TYPE_ID = "character_id"
 
-    def __init__(self, character_ids: list[CharacterId] = []):
+    def __init__(self, character_ids: list[CharacterId]):
         self.character_ids = character_ids
         self.possible_sources = [
             character_id.source_id for character_id in character_ids

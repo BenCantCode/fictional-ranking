@@ -32,10 +32,10 @@ class WikiArticle:
     content: str
 
     def __init__(self, el: ElementBase, namespace=NAMESPACE):
-        namespaces = {"mw": namespace}
-        self.title = el.findtext(f"mw:title", namespaces)  # type: ignore
-        text = el.findtext(f"mw:revision/mw:text", namespaces)
-        self.revision = parsedate(el.findtext(f"mw:revision/mw:timestamp", namespaces))  # type: ignore
+        ns = {"mw": namespace}
+        self.title = el.findtext(f"mw:title", namespaces=ns)  # type: ignore
+        text = el.findtext(f"mw:revision/mw:text", namespaces=ns)
+        self.revision = parsedate(el.findtext(f"mw:revision/mw:timestamp", namespaces=ns))  # type: ignore
         if text:
             self.content = text
         else:

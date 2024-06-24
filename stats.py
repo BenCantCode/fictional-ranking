@@ -14,11 +14,12 @@ logging.basicConfig(level=logging.INFO)
 logging.getLogger("LiteLLM").setLevel(logging.WARNING)
 
 source_manager = SourceManager()
+source_manager.load_source("one_piece")
 evaluator = Evaluator()
 character_filter = CharacterIdFilter(
     [
         CharacterId("one_piece", "Roronoa Zoro"),
-        CharacterId("Peter Parker", "(Earth-616)"),
+        CharacterId("one_piece", "Marshall D. Teach"),
     ]
 )
 match_filter = InvertFilter(DuplicateMatchInRunFilter())

@@ -34,7 +34,7 @@ class Run:
 
     def run(self, source_manager: SourceManager) -> list[MatchResult]:
         if self.db:
-            self.db.start_run(self)
+            self.run_id = self.db.start_run(self)
         matches = list(self.generator.generate_matches(self, source_manager, self.db))
         results = []
         for match in matches:
