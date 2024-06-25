@@ -236,9 +236,9 @@ class RunsDatabase:
             or "outcome" != None
             or "include_dry" == False
         ):
-            query_base = "SELECT * FROM matches WHERE "
+            query_base = "SELECT * FROM matches t1 WHERE "
         else:
-            query_base = "SELECT * FROM matches"
+            query_base = "SELECT * FROM matches t1 "
         query = []
         execute_args = []
         if run_id != None:
@@ -248,7 +248,9 @@ class RunsDatabase:
             query.append("run_name = ?")
             execute_args.append(run_name)
         if include_dry == False:
-            query.append("(SELECT dry_run FROM runs WHERE run_id=run_id) = 0")
+            query.append(
+                "((SELECT dry_run FROM runs t2 WHERE t1.run_id=t2.run_id) = 0)"
+            )
         if outcome != None:
             if outcome == "finished":
                 query.append("outcome IS NOT NULL")
