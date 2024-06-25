@@ -26,7 +26,10 @@ class CharacterFilter(Type):
 
     @staticmethod
     @abstractmethod
-    def from_parameters(parameters: dict[str, Any]) -> CharacterFilter:
+    def from_parameters(
+        parameters: dict[str, Any],
+        registrar: CharacterFilterTypeRegistrar,
+    ) -> CharacterFilter:
         """Instantiate the filter by deserializing the dictionary of parameters previously serialized in the `parameters` method."""
         raise NotImplementedError()
 
@@ -42,7 +45,7 @@ class CharacterFilter(Type):
         """Instantiate a filter from a JSON-deserialized object. Don't override this."""
         filter_type = registrar.get_type(object["type"])
         if filter_type:
-            return filter_type.from_object(object, registrar)
+            return filter_type.from_parameters(object, registrar)
         else:
             raise ValueError()
 
@@ -241,11 +244,11 @@ class EverythingFilter(CharacterFilter):
     def parameters(self):
         return {}
 
-    def from_object(self):
-        return EverythingFilter()
-
     @staticmethod
-    def from_parameters(parameters: dict[str, Any]) -> CharacterFilter:
+    def from_parameters(
+        parameters: dict[str, Any],
+        registrar: CharacterFilterTypeRegistrar,
+    ) -> EverythingFilter:
         return EverythingFilter()
 
 

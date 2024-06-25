@@ -2,13 +2,15 @@ import sqlite3
 from config import *
 from argparse import ArgumentParser
 import json
-from character import Character
+from character import Character, CharacterId
 from datetime import datetime
 from enum import Enum
 from match import PreparedMatch, MatchResult, MatchCharacterMeta, Outcome
-from run import Run
+from run import Run, RunParameters
 
-from typing import Iterable, Any, TypeAlias
+from typing import Iterable, Any, Literal, TypeAlias, TypedDict, TYPE_CHECKING
+
+from source_manager import SourceManager
 
 DB_FORMAT = 1
 
@@ -30,12 +32,12 @@ def _raw_result_to_result(row: sqlite3.Row) -> MatchResult:
         row["match_id"],
         row["run_id"],
         MatchCharacterMeta(
-            row["a_id"],
+            CharacterId.from_str(row["a_id"]),
             row["a_revision"],
             row["a_attributes"],
         ),
         MatchCharacterMeta(
-            row["b_id"],
+            CharacterId.from_str(row["b_id"]),
             row["b_revision"],
             row["b_attributes"],
         ),
@@ -213,16 +215,93 @@ class RunsDatabase:
         self.con.commit()
         return cur.lastrowid  # type: ignore
 
-    def get_results(self, include_dry: bool = False) -> Iterable[MatchResult]:
+    class ResultsFilters(TypedDict):
+        include_dry: bool | None
+        run_id: RunID | None
+        run_name: str | None
+
+    def get_results(
+        self,
+        include_dry: bool = False,
+        run_id: RunID | None = None,
+        run_name: str | None = None,
+        outcome: (
+            Outcome | None | Literal["finished"] | Literal["unfinished"]
+        ) = "finished",
+    ) -> Iterable[MatchResult]:
         cur = self.con.cursor()
-        if include_dry:
-            cur.execute("SELECT * FROM matches")
+        if (
+            "run_id" != None
+            or "run_name" != None
+            or "outcome" != None
+            or "include_dry" == False
+        ):
+            query_base = "SELECT * FROM matches WHERE "
         else:
-            cur.execute(
-                "SELECT * FROM matches WHERE (SELECT dry_run FROM runs WHERE run_id=run_id) = 0"
-            )
+            query_base = "SELECT * FROM matches"
+        query = []
+        execute_args = []
+        if run_id != None:
+            query.append("run_id = ?")
+            execute_args.append(run_id)
+        if run_name != None:
+            query.append("run_name = ?")
+            execute_args.append(run_name)
+        if include_dry == False:
+            query.append("(SELECT dry_run FROM runs WHERE run_id=run_id) = 0")
+        if outcome != None:
+            if outcome == "finished":
+                query.append("outcome IS NOT NULL")
+            elif outcome == "unfinished":
+                query.append("outcome IS NULL")
+            else:
+                query.append("outcome = ?")
+                execute_args.append(_OUTCOME_TO_DB[outcome])
+
+        cur.execute(query_base + " AND ".join(query), execute_args)
         for row in cur.fetchall():
             yield _raw_result_to_result(row)
+
+    def _row_to_run(
+        self, row: dict[str, Any], source_manager: SourceManager, include_db=True
+    ) -> Run:
+        params = RunParameters.from_object(json.loads(row["run_params"]))
+        results = list(self.get_results(run_id=row["run_id"], outcome="finished"))
+        remaining_matches = [
+            result.reprepare(
+                self if include_db else None,
+                source_manager,
+            )
+            for result in self.get_results(run_id=row["run_id"], outcome="unfinished")
+        ]
+        return Run(
+            row["run_name"],
+            params.generator,
+            params.evaluator,
+            self if include_db else None,
+            row["dry_run"],
+            row["run_id"],
+            remaining_matches,
+            results,
+        )
+
+    def get_run_by_id(
+        self, run_id: RunID, source_manager: SourceManager, include_db: bool = True
+    ):
+        """Fully recreate a run from the database, including unfinished matches. May require re-parsing characters."""
+        cur = self.con.cursor()
+        cur.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,))
+        row = cur.fetchone()
+        return self._row_to_run(row, source_manager, include_db)
+
+    def get_run_by_name(
+        self, run_name: str, source_manager: SourceManager, include_db: bool = True
+    ):
+        """Fully recreate a run from the database, including unfinished matches. May require re-parsing characters."""
+        cur = self.con.cursor()
+        cur.execute("SELECT * FROM runs WHERE run_name = ?", (run_name,))
+        row = cur.fetchone()
+        return self._row_to_run(row, source_manager, include_db)
 
 
 if __name__ == "__main__":

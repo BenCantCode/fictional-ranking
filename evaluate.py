@@ -1,5 +1,7 @@
+from __future__ import annotations
 from aiolimiter import AsyncLimiter
 from jinja2 import FileSystemLoader, Environment, BaseLoader
+from openai import APIConnectionError
 from config import *
 from character import Character
 import toml
@@ -15,7 +17,7 @@ from litellm import (
 )
 from os.path import join
 import logging
-from typing import cast, TYPE_CHECKING
+from typing import Any, cast, TYPE_CHECKING
 import random
 
 logger = logging.getLogger(__name__)
@@ -60,12 +62,31 @@ class Evaluator:
         information_version = information["version"]  # type: ignore
         self.information = information
         self.object = {
-            "prompt": {"id": prompt_id, "version": prompt_version},
-            "information": {"id": information_id, "version": information_version},
+            "prompt": {"id": prompt_id, "version": prompt_version, file: prompt},
+            "information": {
+                "id": information_id,
+                "version": information_version,
+                file: information_file,
+            },
         }
 
     def to_object(self):
         return self.object
+
+    @staticmethod
+    def from_object(object: dict[str, Any]) -> Evaluator:
+        if object["information"]["file"] == None:
+            raise NotImplementedError(
+                "Custom information manually provided to previous run (i.e. not in a file), so it cannot be deserialized."
+            )
+        if object["prompt"]["file"] == None:
+            raise NotImplementedError(
+                "Custom prompt manually provided to previous run (i.e. not in a file), so it cannot be deserialized."
+            )
+        return Evaluator(
+            prompt=object["prompt"]["file"],
+            information_file=object["information"]["file"],
+        )
 
     def format(
         self,
@@ -133,6 +154,33 @@ class Evaluator:
         # TODO: Implement aliases
         raise InvalidResult(f"Invalid winner: {winner_raw}")
 
+    async def get_completion(
+        self,
+        model: str,
+        messages: list,
+        rate_limit: AsyncLimiter | None,
+        num_retries: int = NUM_RETRIES,
+        **completion_args,
+    ):
+        for i in range(num_retries):
+            try:
+                coroutine = acompletion(
+                    model,
+                    messages,
+                    stop=self.stop,
+                    stream=False,
+                    **completion_args,
+                )
+                if rate_limit:
+                    async with rate_limit:
+                        return await coroutine
+                else:
+                    return await coroutine
+            except APIConnectionError as e:
+                if i == num_retries - 1:
+                    raise e
+            break
+
     async def evaluate(
         self,
         character_a: Character,
@@ -182,18 +230,7 @@ class Evaluator:
             winner = character_a if random.randint(0, 1) == 0 else character_b
             loser = character_a if character_b == winner else character_b
             return (winner, loser), estimated_cost
-        coroutine = acompletion(
-            model,
-            messages,
-            stop=self.stop,
-            stream=False,
-            **completion_args,
-        )
-        if rate_limit:
-            async with rate_limit:
-                res = await coroutine
-        else:
-            res = await coroutine
+        res = await self.get_completion(model, messages, rate_limit, **completion_args)
         res_text: str | None = res.choices[0].message.content  # type: ignore
         cost = completion_cost(res, model)
         if debug_dump:

@@ -40,7 +40,6 @@ class PreparedMatch:
         character_a: Character,
         character_b: Character,
         db: RunsDatabase | None,
-        done: bool = False,
         match_id: MatchID | None = None,
         outcome: Outcome | None = None,
     ):
@@ -53,7 +52,6 @@ class PreparedMatch:
         self.run_id = run_id
         self.character_a = character_a
         self.character_b = character_b
-        self.done = done
         self.outcome = outcome
         self.db = db
         if db and match_id == None:
@@ -115,3 +113,12 @@ class MatchResult:
 
     def __repr__(self):
         return f"({self.character_a.id} vs. {self.character_b.id}: {self.outcome})"
+
+    def reprepare(self, db: RunsDatabase | None, source_manager: SourceManager):
+        return PreparedMatch(
+            self.run_id,
+            source_manager.get_character(self.character_a.id),
+            source_manager.get_character(self.character_b.id),
+            db,
+            self.match_id,
+        )

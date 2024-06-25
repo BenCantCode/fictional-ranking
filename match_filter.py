@@ -274,7 +274,9 @@ class SelfMatchFilter(MatchFilter):
         return {}
 
     @staticmethod
-    def from_parameters(parameters: dict[str, Any]) -> SelfMatchFilter:
+    def from_parameters(
+        parameters: dict[str, Any], registrar: MatchFilterTypeRegistrar
+    ) -> SelfMatchFilter:
         return SelfMatchFilter()
 
     def ok(
@@ -298,7 +300,9 @@ class CharacterMatchesThresholdFilter(MatchFilter):
         return {"threshold": self.threshold}
 
     @staticmethod
-    def from_parameters(parameters: dict[str, Any]) -> CharacterMatchesThresholdFilter:
+    def from_parameters(
+        parameters: dict[str, Any], registrar: MatchFilterTypeRegistrar
+    ) -> CharacterMatchesThresholdFilter:
         return CharacterMatchesThresholdFilter(parameters["threshold"])
 
     def ok(
@@ -323,4 +327,6 @@ class MatchFilterTypeRegistrar(TypeRegistrar[MatchFilter]):
         InvertFilter,
         DuplicateMatchInRunFilter,
         DuplicateMatchInPriorRunFilter,
+        SelfMatchFilter,
+        CharacterMatchesThresholdFilter,
     ]

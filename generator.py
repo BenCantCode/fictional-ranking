@@ -5,17 +5,16 @@ from source_manager import SourceManager
 from character import CharacterId
 from character_filter import CharacterFilter
 from match_filter import MatchFilter
+from matchmaking import Matchmaker
 from config import (
     CHARACTER_FILTER_TYPE_REGISTRAR,
     MATCH_FILTER_TYPE_REGISTRAR,
     MATCHMAKER_TYPE_REGISTRAR,
 )
-from db import RunsDatabase
-from matchmaking import Matchmaker
-import json
 
 if TYPE_CHECKING:
     from run import Run
+    from db import RunsDatabase
 
 
 class Generator:
@@ -31,8 +30,8 @@ class Generator:
         self.matchmaker = matchmaker
         self.source_versions = source_versions
 
+    @staticmethod
     def from_object(
-        self,
         object: dict[str, Any],
         character_filter_type_registrar=CHARACTER_FILTER_TYPE_REGISTRAR,
         matchmaker_type_registrar=MATCHMAKER_TYPE_REGISTRAR,
@@ -40,7 +39,7 @@ class Generator:
     ):
         return Generator(
             CharacterFilter.from_object(
-                object["character_filter"], character_filter_type_registrar
+                object["character_filters"], character_filter_type_registrar
             ),
             MatchFilter.from_object(
                 object["match_filter"], match_filter_type_registrar

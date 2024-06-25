@@ -38,6 +38,7 @@ COST_UPDATE_INTERVAL = 0.10
 # For rate limiting
 REQUESTS_PER_INTERVAL = 10
 INTERVAL_SECS = 60
+NUM_RETRIES = 10
 
 # Prompt (Jinja2 in toml)
 PROMPT = "prompt_end.toml"
@@ -49,6 +50,8 @@ MODEL = "claude-3-haiku-20240307"
 COMPLETION_ARGS = {
     # The temperature. A lower temperature value generally results in less creative responses.
     "temperature": 0,
+    # How long to wait before retrying/failing
+    "timeout": 120,
 }
 
 CHARACTER_FILTER_TYPE_REGISTRAR = CharacterFilterTypeRegistrar()

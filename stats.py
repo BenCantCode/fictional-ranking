@@ -42,19 +42,20 @@ character_filter = EverythingFilter()
 #         CharacterId("one_piece", "Bepo"),
 #     ]
 # )
-match_filter = (
-    ~SelfMatchFilter()
-    & ~DuplicateMatchInRunFilter()
-    & ~CharacterMatchesThresholdFilter(2)
-)
-matchmaker = RandomMatchmaker(1)
-# matchmaker = PowermatchingMatchmaker(rate_characters(list(db.get_results())))
-generator = Generator(
-    character_filter, match_filter, matchmaker, source_manager.source_versions
-)
-run = Run("one_piece_initial", generator, evaluator, db, False)
-results, cost = asyncio.run(run.run(source_manager, verbose=True))
-with open("results.txt", "w") as file:
+# match_filter = (
+#     ~SelfMatchFilter()
+#     & ~DuplicateMatchInRunFilter()
+#     & ~CharacterMatchesThresholdFilter(2)
+# )
+# matchmaker = RandomMatchmaker(1)
+# # matchmaker = PowermatchingMatchmaker(rate_characters(list(db.get_results())))
+# generator = Generator(
+#     character_filter, match_filter, matchmaker, source_manager.source_versions
+# )
+# run = Run("one_piece_initial", generator, evaluator, db, False)
+run = db.get_run_by_name("one_piece_initial", source_manager)
+results, cost = asyncio.run(run.start(source_manager, verbose=True))
+with open("results.txt", "a") as file:
     for result in results:
         file.write(
             f"{result.character_a.id} vs. {result.character_b.id}: {result.outcome}\n"
