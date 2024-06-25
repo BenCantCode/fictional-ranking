@@ -230,8 +230,8 @@ class DuplicateMatchInPriorRunFilter(MatchFilter):
         self.prior_matches = [
             (result.character_a.id, result.character_b.id)
             for result in results
-            if ignore_unfinished
-            and result.outcome not in [Outcome.A_WINS, Outcome.B_WINS]
+            if (not ignore_unfinished)
+            or (result.outcome in [Outcome.A_WINS, Outcome.B_WINS])
         ]
         self.order_dependent = order_dependent
         self.ignore_unfinished = ignore_unfinished
@@ -253,7 +253,6 @@ class DuplicateMatchInPriorRunFilter(MatchFilter):
         #     None, parameters["order_dependent"], parameters["ignore_unfinished"]
         # )
 
-    @abstractmethod
     def ok(
         self,
         match: tuple[CharacterId, CharacterId],
@@ -261,7 +260,7 @@ class DuplicateMatchInPriorRunFilter(MatchFilter):
     ):
         if match in self.prior_matches:
             return True
-        if self.order_dependent and (match[1], match[0]) in self.prior_matches:
+        if (not self.order_dependent) and (match[1], match[0]) in self.prior_matches:
             return True
         return False
 
