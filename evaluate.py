@@ -62,11 +62,11 @@ class Evaluator:
         information_version = information["version"]  # type: ignore
         self.information = information
         self.object = {
-            "prompt": {"id": prompt_id, "version": prompt_version, file: prompt},
+            "prompt": {"id": prompt_id, "version": prompt_version, "file": prompt},
             "information": {
                 "id": information_id,
                 "version": information_version,
-                file: information_file,
+                "file": information_file,
             },
         }
 
