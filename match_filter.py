@@ -203,15 +203,15 @@ class DuplicateMatchInRunFilter(MatchFilter):
         if any(
             prior_match
             for prior_match in matches
-            if prior_match.character_a == match[0]
-            and prior_match.character_b == match[1]
+            if prior_match.character_a.id == match[0]
+            and prior_match.character_b.id == match[1]
         ):
             return True
         if not self.order_dependent and any(
             prior_match
             for prior_match in matches
-            if prior_match.character_b == match[0]
-            and prior_match.character_a == match[1]
+            if prior_match.character_b.id == match[0]
+            and prior_match.character_a.id == match[1]
         ):
             return True
         return False
