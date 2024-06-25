@@ -12,7 +12,7 @@ load_dotenv()
 # If you want to disable telemetry (see https://litellm.vercel.app/docs/observability/telemetry)
 # litellm.telemetry = False
 
-DEBUG_DUMP = True
+DEBUG_DUMP = False
 
 # Folder locations
 PROJECT_ROOT = dirname(__file__)
@@ -31,6 +31,13 @@ DB_PATH = join(PROJECT_ROOT, "runs.sqlite")
 MAX_CHARACTERS = 100000
 MAX_TOKENS = None
 MAX_COST = None
+
+# How often to print the running cost in a run
+COST_UPDATE_INTERVAL = 0.10
+
+# For rate limiting
+REQUESTS_PER_INTERVAL = 10
+INTERVAL_SECS = 60
 
 # Prompt (Jinja2 in toml)
 PROMPT = "prompt_end.toml"

@@ -1,12 +1,22 @@
+from aiolimiter import AsyncLimiter
 from jinja2 import FileSystemLoader, Environment, BaseLoader
 from config import *
 from character import Character
 import toml
 from exceptions import *
-from litellm import completion, completion_cost, ModelResponse, Choices
+from litellm import (
+    acompletion,
+    completion_cost,
+    ModelResponse,
+    Choices,
+    get_max_tokens,
+    cost_per_token,
+    token_counter,
+)
 from os.path import join
 import logging
 from typing import cast, TYPE_CHECKING
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -123,10 +133,11 @@ class Evaluator:
         # TODO: Implement aliases
         raise InvalidResult(f"Invalid winner: {winner_raw}")
 
-    def evaluate(
+    async def evaluate(
         self,
         character_a: Character,
         character_b: Character,
+        dry_run: bool,
         model: str = MODEL,
         completion_args: dict = COMPLETION_ARGS,
         max_characters: int = MAX_CHARACTERS,
@@ -134,7 +145,9 @@ class Evaluator:
         max_cost: float | None = MAX_COST,
         debug_dump: bool = DEBUG_DUMP,
         debug_folder: str = DEBUG_FOLDER,
-    ) -> tuple[Character, Character]:
+        rate_limit: AsyncLimiter | None = None,
+        verbose: bool = False,
+    ) -> tuple[tuple[Character, Character] | None, float]:
         prompt_text = self.format(
             character_a,
             character_b,
@@ -146,30 +159,59 @@ class Evaluator:
         if debug_dump:
             with open(join(debug_folder, "last_prompt.txt"), "w") as file:
                 file.write(prompt_text)
-        res = completion(
+        messages = [
+            {
+                "role": "user",
+                "content": prompt_text,
+            },
+        ]
+        if dry_run:
+            if verbose:
+                logger.info("%s vs. %s", character_a.id, character_b.id)
+            estimated_response_length = get_max_tokens(model) or 4096
+            estimated_cost = sum(
+                cost_per_token(
+                    model,
+                    prompt_tokens=token_counter(model=model, text=prompt_text),
+                    completion_tokens=estimated_response_length,
+                )
+            )
+            if verbose:
+                logger.info("Predicted cost: %f", estimated_cost)
+            # Random winner
+            winner = character_a if random.randint(0, 1) == 0 else character_b
+            loser = character_a if character_b == winner else character_b
+            return (winner, loser), estimated_cost
+        coroutine = acompletion(
             model,
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt_text,
-                },
-            ],
+            messages,
             stop=self.stop,
             stream=False,
             **completion_args,
         )
+        if rate_limit:
+            async with rate_limit:
+                res = await coroutine
+        else:
+            res = await coroutine
         res_text: str | None = res.choices[0].message.content  # type: ignore
+        cost = completion_cost(res, model)
         if debug_dump:
             with open(join(debug_folder, "last_response.txt"), "w") as file:
                 file.write(res_text or "")
+        winner = None
         if res_text == None:
-            logger.info(f"No result for %s vs. %s", character_a.id, character_b.id)
-            raise InvalidResult("Response is empty.")
-        winner = self.parse_result(res_text, character_a, character_b)
-        loser = character_a if character_b == winner else character_b
-        logger.info(f"W: %s, L: %s", winner.id, loser.id)
-        try:
-            logger.info(f"Cost: %f", completion_cost(res, model))
-        except:
-            pass
-        return (winner, loser)
+            if verbose:
+                logger.info(f"No result for %s vs. %s", character_a.id, character_b.id)
+            return (None, cost)
+        else:
+            try:
+                winner = self.parse_result(res_text, character_a, character_b)
+                loser = character_a if character_b == winner else character_b
+                if verbose:
+                    logger.info(f"W: %s, L: %s", winner.id, loser.id)
+                return ((winner, loser), cost)
+            except InvalidResult as e:
+                if verbose:
+                    logger.info("Invalid result: %s", str(e))
+                return (None, cost)

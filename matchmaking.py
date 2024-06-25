@@ -7,6 +7,7 @@ from match import PreparedMatch
 from match_filter import MatchFilter
 from type_registrar import Type, TypeRegistrar
 import json
+from rating import DEFAULT_RATING
 
 
 class Matchmaker(Type):
@@ -99,10 +100,12 @@ class PowermatchingMatchmaker(Matchmaker):
         matches: list[PreparedMatch],
     ) -> Iterable[tuple[CharacterId, CharacterId]]:
         for character_id in character_ids:
-            rating = self.ratings[character_id]
+            rating = self.ratings.get(character_id, DEFAULT_RATING)
             distances = sorted(
                 character_ids,
-                key=lambda opponent_id: abs(rating - self.ratings[opponent_id]),
+                key=lambda opponent_id: abs(
+                    rating - self.ratings.get(opponent_id, DEFAULT_RATING)
+                ),
             )
             for opponent_id in distances:
                 match = (character_id, opponent_id)

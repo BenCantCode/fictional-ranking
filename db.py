@@ -21,7 +21,7 @@ class DbFormatMismatchException(Exception):
 
 
 # Ensure changing the Match class doesn't affect the storage of the database.
-_OUTCOME_TO_DB = {Outcome.A_WINS: 1, Outcome.B_WINS: 2, Outcome.ERROR: -1}
+_OUTCOME_TO_DB = {Outcome.A_WINS: 1, Outcome.B_WINS: 2, Outcome.ERROR: -1, None: None}
 _DB_TO_OUTCOME = dict((v, k) for (k, v) in _OUTCOME_TO_DB.items())
 
 
@@ -40,6 +40,7 @@ def _raw_result_to_result(row: sqlite3.Row) -> MatchResult:
             row["b_attributes"],
         ),
         _DB_TO_OUTCOME[row["outcome"]],
+        row["cost"],
     )
 
 
@@ -62,10 +63,10 @@ class RunsDatabase:
     def initialize_db(self):
         cur = self.con.cursor()
         cur.execute(
-            "CREATE TABLE runs (run_id INTEGER PRIMARY KEY, run_name TEXT, run_params TEXT, run_status INT, run_start TEXT)"
+            "CREATE TABLE runs (run_id INTEGER PRIMARY KEY, run_name TEXT, run_params TEXT, dry_run INT, run_status INT, run_start TEXT)"
         )
         cur.execute(
-            "CREATE TABLE matches (match_id INTEGER PRIMARY KEY, run_id INTEGER, match_settings TEXT, a_id TEXT, a_revision TEXT, a_attributes TEXT, b_id TEXT, b_revision TEXT, b_attributes TEXT, outcome INT, FOREIGN KEY(run_id) REFERENCES runs(run_id))"
+            "CREATE TABLE matches (match_id INTEGER PRIMARY KEY, run_id INTEGER, match_settings TEXT, a_id TEXT, a_revision TEXT, a_attributes TEXT, b_id TEXT, b_revision TEXT, b_attributes TEXT, outcome INT, cost REAL, FOREIGN KEY(run_id) REFERENCES runs(run_id))"
         )
         cur.execute("CREATE TABLE meta (key TEXT, value TEXT)")
         cur.execute(
@@ -77,8 +78,13 @@ class RunsDatabase:
     def start_run(self, run: Run) -> RunID:
         cur = self.con.cursor()
         cur.execute(
-            "INSERT INTO runs VALUES (NULL, ?, ?, 0, ?)",
-            (run.name, json.dumps(run.to_object()), str(datetime.now())),
+            "INSERT INTO runs VALUES (NULL, ?, ?, ?, 0, ?)",
+            (
+                run.name,
+                json.dumps(run.to_object()),
+                int(run.dry_run),
+                str(datetime.now()),
+            ),
         )
         self.con.commit()
         return cur.lastrowid  # type: ignore
@@ -94,10 +100,11 @@ class RunsDatabase:
         a_attributes: str = "{}",
         b_attributes: str = "{}",
         match_settings: str = "{}",
+        cost: float | None = None,
     ) -> MatchID:
         cur = self.con.cursor()
         cur.execute(
-            "INSERT INTO matches VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO matches VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 run_id,
                 match_settings,
@@ -108,6 +115,7 @@ class RunsDatabase:
                 b_revision,
                 b_attributes,
                 outcome,
+                cost,
             ),
         )
         self.con.commit()
@@ -130,29 +138,48 @@ class RunsDatabase:
         match_id: MatchID,
         a_id: str,
         a_revision: str,
+        a_attributes: str,
         b_id: str,
         b_revision: str,
+        b_attributes: str,
         outcome: int | None,
-        a_attributes: str = "{}",
-        b_attributes: str = "{}",
-        match_settings: str = "{}",
+        cost: float | None,
+        match_settings: str | None = None,
     ) -> MatchID:
         cur = self.con.cursor()
-        cur.execute(
-            "UPDATE matches SET run_id = ?, match_settings = ?, a_id = ?, a_revision = ?, a_attributes = ?, b_id = ?, b_revision = ?, b_attributes = ?, outcome = ? WHERE match_id = ?",
-            (
-                run_id,
-                match_settings,
-                a_id,
-                a_revision,
-                a_attributes,
-                b_id,
-                b_revision,
-                b_attributes,
-                outcome,
-                match_id,
-            ),
-        )
+        if match_settings != None:
+            cur.execute(
+                "UPDATE matches SET run_id = ?, match_settings = ?, a_id = ?, a_revision = ?, a_attributes = ?, b_id = ?, b_revision = ?, b_attributes = ?, outcome = ?, cost = ? WHERE match_id = ?",
+                (
+                    run_id,
+                    match_settings,
+                    a_id,
+                    a_revision,
+                    a_attributes,
+                    b_id,
+                    b_revision,
+                    b_attributes,
+                    outcome,
+                    cost,
+                    match_id,
+                ),
+            )
+        else:
+            cur.execute(
+                "UPDATE matches SET run_id = ?, a_id = ?, a_revision = ?, a_attributes = ?, b_id = ?, b_revision = ?, b_attributes = ?, outcome = ?, cost = ? WHERE match_id = ?",
+                (
+                    run_id,
+                    a_id,
+                    a_revision,
+                    a_attributes,
+                    b_id,
+                    b_revision,
+                    b_attributes,
+                    outcome,
+                    cost,
+                    match_id,
+                ),
+            )
         self.con.commit()
         return cur.lastrowid  # type: ignore
 
@@ -163,29 +190,37 @@ class RunsDatabase:
             raise Exception("Missing run id!")
         if match.match_id == None:
             raise Exception("Missing match id!")
-
+        # TODO: Add character attributes
         return self._update_match_raw(
-            match.match_id,
+            match.run_id,
             match.match_id,
             str(match.character_a.id),
             match.character_a.revision,
+            "{}",
             str(match.character_b.id),
             match.character_b.revision,
-            _OUTCOME_TO_DB.get(match.outcome) if match.outcome else None,
+            "{}",
+            _OUTCOME_TO_DB[match.outcome] if match.outcome else None,
+            match.cost,
         )
 
-    def end_run(self, run_name: str, successful: bool) -> RunID:
+    def end_run(self, run: Run, successful: bool) -> RunID:
         cur = self.con.cursor()
         cur.execute(
-            "UPDATE runs SET status = ? WHERE name = ?",
-            (1 if successful else -1, run_name),
+            "UPDATE runs SET run_status = ? WHERE run_id = ?",
+            (1 if successful else -1, run.run_id),
         )
         self.con.commit()
         return cur.lastrowid  # type: ignore
 
-    def get_results(self) -> Iterable[MatchResult]:
+    def get_results(self, include_dry: bool = False) -> Iterable[MatchResult]:
         cur = self.con.cursor()
-        cur.execute("SELECT * FROM matches")
+        if include_dry:
+            cur.execute("SELECT * FROM matches")
+        else:
+            cur.execute(
+                "SELECT * FROM matches WHERE (SELECT dry_run FROM runs WHERE run_id=run_id) = 0"
+            )
         for row in cur.fetchall():
             yield _raw_result_to_result(row)
 
@@ -205,6 +240,7 @@ if __name__ == "__main__":
     parser_debug_end.add_argument("run_name")
     parser_results = subparsers.add_parser("results")
     parser_results.add_argument("-run_name")
+    parser_results.add_argument("-includedry", action="store_true")
     args = parser.parse_args()
     # Connect to DB
     db = RunsDatabase(args.path or DB_PATH)
@@ -216,9 +252,5 @@ if __name__ == "__main__":
     elif args.command == "debug_end":
         db.end_run(args.run_name, True)
     elif args.command == "results":
-        results = list(db.get_results())
-        if args.run_name:
-            # test
-            pass
-        else:
-            print(results)
+        # TODO: Add run name filtering
+        print(list(db.get_results(include_dry=args.includedry)))

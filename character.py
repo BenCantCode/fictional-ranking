@@ -15,14 +15,14 @@ class CharacterId:
         return hash(str(self))
 
     def __eq__(self, other: object) -> bool:
-        if isinstance(other, str):
-            return str(self) == other
-        elif isinstance(other, CharacterId):
+        if isinstance(other, CharacterId):
             return self.source_id == other.source_id and self.name == other.name
-        elif isinstance(other, Character):
-            return other.id == self
         else:
             return False
+
+    @staticmethod
+    def from_str(s: str):
+        return CharacterId(s[: s.index("/")], s[s.index("/") + 1 :])
 
 
 class Section:

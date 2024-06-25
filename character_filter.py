@@ -224,6 +224,10 @@ class SourceFilter(CharacterFilter):
     def parameters(self):
         return {"sources": self.source_ids}
 
+    @staticmethod
+    def from_parameters(parameters: dict[str, Any]) -> SourceFilter:
+        return SourceFilter(parameters["sources"])
+
 
 class EverythingFilter(CharacterFilter):
     """Matches everything."""

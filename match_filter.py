@@ -273,7 +273,8 @@ class SelfMatchFilter(MatchFilter):
     def parameters(self):
         return {}
 
-    def from_parameters(self) -> SelfMatchFilter:
+    @staticmethod
+    def from_parameters(parameters: dict[str, Any]) -> SelfMatchFilter:
         return SelfMatchFilter()
 
     def ok(
@@ -282,6 +283,37 @@ class SelfMatchFilter(MatchFilter):
         matches: list[PreparedMatch],
     ):
         return potential_match[0] == potential_match[1]
+
+
+class CharacterMatchesThresholdFilter(MatchFilter):
+    """Tests the number of matches in the current run that Character B is in."""
+
+    TYPE_ID = "character_matches_threshold"
+
+    def __init__(self, threshold: int):
+        self.threshold = threshold
+
+    @property
+    def parameters(self):
+        return {"threshold": self.threshold}
+
+    @staticmethod
+    def from_parameters(parameters: dict[str, Any]) -> CharacterMatchesThresholdFilter:
+        return CharacterMatchesThresholdFilter(parameters["threshold"])
+
+    def ok(
+        self,
+        potential_match: tuple[CharacterId, CharacterId],
+        matches: list[PreparedMatch],
+    ):
+        b_id = potential_match[1]
+        b_matches = 1
+        for match in matches:
+            if b_id == match.character_a.id or b_id == match.character_b.id:
+                b_matches += 1
+                if b_matches > self.threshold:
+                    return True
+        return False
 
 
 class MatchFilterTypeRegistrar(TypeRegistrar[MatchFilter]):

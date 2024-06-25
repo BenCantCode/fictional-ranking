@@ -59,28 +59,29 @@ class PreparedMatch:
         if db and match_id == None:
             self.match_id = db.start_match(self)
 
-    def evaluate(self, evaluator: Evaluator, **evaluation_args) -> MatchResult:
+    async def evaluate(
+        self, evaluator: Evaluator, dry_run: bool, **evaluation_args
+    ) -> MatchResult:
         """
         Run a prepared match using the provided `evaluator`.
         If the PreparedMatch instance contains a `RunsDatabase` reference (as provided in the initializer),
         the database will be updated with the result of the match.
         """
-        try:
-            winner, loser = evaluator.evaluate(
-                self.character_a,
-                self.character_b,
-                **evaluation_args,
-            )
-            outcome = None
+        (w_l, cost) = await evaluator.evaluate(
+            self.character_a,
+            self.character_b,
+            dry_run,
+            **evaluation_args,
+        )
+        outcome = Outcome.ERROR
+        if w_l:
+            winner = w_l[0]
             if winner.id == self.character_a.id:
                 outcome = Outcome.A_WINS
             elif winner.id == self.character_b.id:
                 outcome = Outcome.B_WINS
             else:
                 raise InvalidResult(f"By God, it's {winner.id} with a steel chair!!")
-        except:
-            outcome = Outcome.ERROR
-            pass
         self.result = MatchResult(
             self.match_id,
             self.run_id,
@@ -88,6 +89,7 @@ class PreparedMatch:
             MatchCharacterMeta.from_character(self.character_a, {}),
             MatchCharacterMeta.from_character(self.character_b, {}),
             outcome,
+            cost,
         )
         if self.db:
             self.db.update_match(self.result)
@@ -101,10 +103,15 @@ class MatchResult:
         run_id: RunID | None,
         character_a: MatchCharacterMeta,
         character_b: MatchCharacterMeta,
-        outcome: Outcome,
+        outcome: Outcome | None,
+        cost: float | None,
     ):
         self.match_id = match_id
         self.run_id = run_id
         self.character_a = character_a
         self.character_b = character_b
         self.outcome = outcome
+        self.cost = cost
+
+    def __repr__(self):
+        return f"({self.character_a.id} vs. {self.character_b.id}: {self.outcome})"

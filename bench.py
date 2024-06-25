@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+from character import CharacterId
 from config import *
 from os.path import join
 from evaluate import Evaluator
@@ -7,6 +8,7 @@ from source_manager import SourceManager
 import logging
 import toml
 import sys
+import asyncio
 
 logging.basicConfig(level=logging.WARNING)
 logging.getLogger("LiteLLM").setLevel(logging.WARNING)
@@ -32,12 +34,19 @@ for eval_name in sys.argv[1:]:
         if section_id == "requires":
             continue
         print(section_id)
+        # TODO: Make async
         for match in section:
             print(f"{match['winner']} vs. {match['loser']}")
-            expected_winner = manager.get_character(match["winner"])
-            expected_loser = manager.get_character(match["loser"])
-            winner_a, loser_a = evaluator.evaluate(expected_winner, expected_loser)
-            if winner_a == expected_winner:
+            expected_winner = manager.get_character(
+                CharacterId.from_str(match["winner"])
+            )
+            expected_loser = manager.get_character(CharacterId.from_str(match["loser"]))
+            w_l, cost = asyncio.run(
+                evaluator.evaluate(expected_winner, expected_loser, False)
+            )
+            if not w_l:
+                print("No result")
+            elif w_l[0] == expected_winner:
                 print("A Correct")
                 correct += 1
                 correct_a += 1
@@ -45,8 +54,12 @@ for eval_name in sys.argv[1:]:
                 print("A Incorrect")
                 incorrect += 1
                 incorrect_a += 1
-            winner_b, loser_b = evaluator.evaluate(expected_loser, expected_winner)
-            if winner_b == expected_winner:
+            w_l, cost = asyncio.run(
+                evaluator.evaluate(expected_loser, expected_winner, False)
+            )
+            if not w_l:
+                print("No result")
+            elif w_l[0] == expected_winner:
                 print("B Correct")
                 correct += 1
                 correct_b += 1

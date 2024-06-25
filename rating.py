@@ -2,6 +2,8 @@ from choix import ilsr_rankings
 from match import MatchResult, Outcome
 from character import CharacterId
 
+DEFAULT_RATING = 0
+
 
 def _map_characters(
     results: list[MatchResult],
@@ -33,8 +35,10 @@ def _results_to_tuples(
 
 
 def rate_characters(results: list[MatchResult]) -> dict[CharacterId, float]:
+    if len(results) == 0:
+        return {}
     n, id_to_int, int_to_id = _map_characters(results)
     result_tuples = _results_to_tuples(results, id_to_int)
-    raw_rankings = ilsr_rankings(n, result_tuples)
+    raw_rankings = ilsr_rankings(n, result_tuples, alpha=0.0001)
     rankings = dict((int_to_id[i], raw_rankings[i]) for i in range(n))
     return rankings
