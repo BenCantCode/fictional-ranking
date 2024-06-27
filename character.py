@@ -11,6 +11,9 @@ class CharacterId:
     def __str__(self):
         return f"{self.source_id}/{self.name}"
 
+    def __repr__(self):
+        return str(self)
+
     def __hash__(self):
         return hash(str(self))
 

@@ -16,7 +16,6 @@ logging.getLogger("LiteLLM").setLevel(logging.WARNING)
 manager = SourceManager()
 evaluator = Evaluator()
 
-
 for eval_name in sys.argv[1:]:
     print(eval_name)
     eval_results = {}

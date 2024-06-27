@@ -1,9 +1,11 @@
 from __future__ import annotations
+
+from aiolimiter import AsyncLimiter
 from character import Character, CharacterId
 
 from enum import Enum
 from exceptions import InvalidResult
-from typing import Any, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
     from db import RunsDatabase, RunID, MatchID
@@ -58,17 +60,22 @@ class PreparedMatch:
             self.match_id = db.start_match(self)
 
     async def evaluate(
-        self, evaluator: Evaluator, dry_run: bool, **evaluation_args
+        self,
+        evaluator: Evaluator,
+        dry_run: bool,
+        rate_limit: AsyncLimiter,
+        **evaluation_args,
     ) -> MatchResult:
         """
         Run a prepared match using the provided `evaluator`.
         If the PreparedMatch instance contains a `RunsDatabase` reference (as provided in the initializer),
         the database will be updated with the result of the match.
         """
-        (w_l, cost) = await evaluator.evaluate(
+        (w_l, cost, match_settings) = await evaluator.evaluate(
             self.character_a,
             self.character_b,
             dry_run,
+            rate_limit,
             **evaluation_args,
         )
         outcome = Outcome.ERROR
@@ -88,10 +95,23 @@ class PreparedMatch:
             MatchCharacterMeta.from_character(self.character_b, {}),
             outcome,
             cost,
+            match_settings,
         )
         if self.db:
             self.db.update_match(self.result)
         return self.result
+
+
+class MatchSettings:
+    def __init__(self, model: str | None = None):
+        self.model = model
+
+    def to_object(self):
+        return {"model": self.model}
+
+    @staticmethod
+    def from_object(object: dict[str, Any]):
+        return MatchSettings(model=object["model"])
 
 
 class MatchResult:
@@ -103,6 +123,7 @@ class MatchResult:
         character_b: MatchCharacterMeta,
         outcome: Outcome | None,
         cost: float | None,
+        match_settings: MatchSettings | None = None,
     ):
         self.match_id = match_id
         self.run_id = run_id
@@ -110,6 +131,7 @@ class MatchResult:
         self.character_b = character_b
         self.outcome = outcome
         self.cost = cost
+        self.match_settings = match_settings
 
     def __repr__(self):
         return f"({self.character_a.id} vs. {self.character_b.id}: {self.outcome})"

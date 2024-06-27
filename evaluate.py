@@ -1,11 +1,12 @@
 from __future__ import annotations
 from aiolimiter import AsyncLimiter
 from jinja2 import FileSystemLoader, Environment, BaseLoader
-from openai import APIConnectionError
 from config import *
 from character import Character
 import toml
 from exceptions import *
+import os.path
+import time
 from litellm import (
     acompletion,
     completion_cost,
@@ -14,11 +15,16 @@ from litellm import (
     get_max_tokens,
     cost_per_token,
     token_counter,
+    Router,
+    APIConnectionError,
+    RateLimitError,
 )
 from os.path import join
 import logging
 from typing import Any, cast, TYPE_CHECKING
 import random
+
+from match import MatchSettings
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +109,6 @@ class Evaluator:
         else:
             character_a_name = f"{character_a.name} ({self.information[character_a.source_id]['name']})"
             character_b_name = f"{character_b.name} ({self.information[character_b.source_id]['name']})"
-
         character_a_description = character_a.abridged_text(
             model, max_characters, max_tokens, max_cost
         )
@@ -144,6 +149,7 @@ class Evaluator:
             return character_a
         if winner_raw == expected_b:
             return character_b
+        logger.warn("Complex result: %s", winner_raw)
         # If they don't match, return whichever has more overlap
         overlap_a = len(set(expected_a.split(" ")) & set(winner_raw.split(" ")))
         overlap_b = len(set(expected_b.split(" ")) & set(winner_raw.split(" ")))
@@ -158,44 +164,43 @@ class Evaluator:
         self,
         model: str,
         messages: list,
-        rate_limit: AsyncLimiter | None,
+        rate_limit: AsyncLimiter,
         num_retries: int = NUM_RETRIES,
         **completion_args,
-    ):
-        for i in range(num_retries):
+    ) -> ModelResponse:
+        attempts = 0
+        while True:
             try:
-                coroutine = acompletion(
-                    model,
-                    messages,
-                    stop=self.stop,
-                    stream=False,
-                    **completion_args,
-                )
-                if rate_limit:
-                    async with rate_limit:
-                        return await coroutine
-                else:
-                    return await coroutine
-            except APIConnectionError as e:
-                if i == num_retries - 1:
+                async with rate_limit:
+                    return await acompletion(
+                        model=model, messages=messages, **completion_args
+                    )  # type: ignore
+                raise Exception("Impossible?")
+            except (APIConnectionError, RateLimitError) as e:
+                logger.warn("Completion attempt failed: %s", str(e))
+                logger.warn("Retrying...")
+                attempts += 1
+                if attempts == num_retries:
                     raise e
-            break
 
     async def evaluate(
         self,
         character_a: Character,
         character_b: Character,
         dry_run: bool,
+        rate_limit: AsyncLimiter,
         model: str = MODEL,
         completion_args: dict = COMPLETION_ARGS,
         max_characters: int = MAX_CHARACTERS,
         max_tokens: int | None = MAX_TOKENS,
         max_cost: float | None = MAX_COST,
         debug_dump: bool = DEBUG_DUMP,
+        debug_filter: list[CharacterId] | None = DEBUG_DUMP_FILTER,
+        debug_dump_prefix: str = "debug",
         debug_folder: str = DEBUG_FOLDER,
-        rate_limit: AsyncLimiter | None = None,
         verbose: bool = False,
-    ) -> tuple[tuple[Character, Character] | None, float]:
+    ) -> tuple[tuple[Character, Character] | None, float, MatchSettings]:
+        match_settings = MatchSettings(model)
         prompt_text = self.format(
             character_a,
             character_b,
@@ -229,26 +234,37 @@ class Evaluator:
             # Random winner
             winner = character_a if random.randint(0, 1) == 0 else character_b
             loser = character_a if character_b == winner else character_b
-            return (winner, loser), estimated_cost
+            return (winner, loser), estimated_cost, match_settings
         res = await self.get_completion(model, messages, rate_limit, **completion_args)
         res_text: str | None = res.choices[0].message.content  # type: ignore
         cost = completion_cost(res, model)
         if debug_dump:
-            with open(join(debug_folder, "last_response.txt"), "w") as file:
-                file.write(res_text or "")
+            if (
+                (not debug_filter)
+                or character_a.id in debug_filter
+                or character_b.id in debug_filter
+            ):
+                with open(
+                    join(
+                        debug_folder,
+                        f"{debug_dump_prefix}-{str(character_a.id).replace(os.path.sep, '-')}-vs-{str(character_b.id).replace(os.path.sep, '-')}.txt",
+                    ),
+                    "w",
+                ) as file:
+                    file.write(res_text or "")
         winner = None
         if res_text == None:
             if verbose:
                 logger.info(f"No result for %s vs. %s", character_a.id, character_b.id)
-            return (None, cost)
+            return (None, cost, match_settings)
         else:
             try:
                 winner = self.parse_result(res_text, character_a, character_b)
                 loser = character_a if character_b == winner else character_b
                 if verbose:
                     logger.info(f"W: %s, L: %s", winner.id, loser.id)
-                return ((winner, loser), cost)
+                return ((winner, loser), cost, match_settings)
             except InvalidResult as e:
                 if verbose:
                     logger.info("Invalid result: %s", str(e))
-                return (None, cost)
+                return (None, cost, match_settings)

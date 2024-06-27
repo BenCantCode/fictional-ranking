@@ -225,6 +225,7 @@ class DuplicateMatchInPriorRunFilter(MatchFilter):
         results: list[MatchResult],
         order_dependent: bool = False,
         ignore_unfinished: bool = True,
+        threshold: int = 1,
     ):
         # TODO: Take into account character attributes
         self.prior_matches = [
@@ -235,6 +236,7 @@ class DuplicateMatchInPriorRunFilter(MatchFilter):
         ]
         self.order_dependent = order_dependent
         self.ignore_unfinished = ignore_unfinished
+        self.threshold = threshold
 
     @property
     def parameters(self) -> dict[str, Any]:
@@ -258,10 +260,16 @@ class DuplicateMatchInPriorRunFilter(MatchFilter):
         match: tuple[CharacterId, CharacterId],
         matches: list[PreparedMatch],
     ):
-        if match in self.prior_matches:
-            return True
-        if (not self.order_dependent) and (match[1], match[0]) in self.prior_matches:
-            return True
+        num = 0
+        for prior_match in self.prior_matches:
+            if prior_match == match:
+                num += 1
+            elif (not self.order_dependent) and prior_match == (match[1], match[0]):
+                num += 1
+            else:
+                continue
+            if num >= self.threshold:
+                return True
         return False
 
 

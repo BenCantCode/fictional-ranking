@@ -1,14 +1,20 @@
 from __future__ import annotations
 
+from aiolimiter import AsyncLimiter
+
 
 from character import CharacterId
 from evaluate import Evaluator
 from generator import Generator
 from typing import TYPE_CHECKING, Any
-from config import COST_UPDATE_INTERVAL, INTERVAL_SECS, REQUESTS_PER_INTERVAL
+from config import (
+    COST_UPDATE_INTERVAL,
+    INTERVAL_SECS,
+    REQUESTS_PER_INTERVAL,
+    TOKENS_PER_INTERVAL,
+)
+from tqdm.asyncio import tqdm
 from math import ceil
-from aiolimiter import AsyncLimiter
-from asyncio import gather
 import logging
 
 logger = logging.getLogger(__name__)
@@ -79,10 +85,9 @@ class Run:
     async def start(
         self,
         source_manager: SourceManager,
+        rate_limit: AsyncLimiter,
         verbose: bool = False,
         cost_update_interval=COST_UPDATE_INTERVAL,
-        requests_per_interval=REQUESTS_PER_INTERVAL,
-        interval_secs=INTERVAL_SECS,
     ) -> tuple[list[MatchResult], float]:
         print("Starting Run")
         if self.db and not self.run_id:
@@ -98,7 +103,6 @@ class Run:
             self.results = []
         cost = 0
         next_cost_update = cost_update_interval
-        rate_limit = AsyncLimiter(requests_per_interval, interval_secs)
         print("Running Matches...")
         coroutines = []
         if self.remaining_matches != None and self.settings.evaluator == None:
@@ -110,8 +114,9 @@ class Run:
                 result = await match.evaluate(
                     self.settings.evaluator,  # type: ignore
                     self.dry_run,
+                    rate_limit,
                     verbose=verbose,
-                    rate_limit=rate_limit,
+                    debug_dump_prefix=str(self.name),
                 )
                 if result.cost:
                     cost += result.cost
@@ -123,7 +128,7 @@ class Run:
                 self.results.append(result)
 
             coroutines.append(evaluate(match))
-        await gather(*coroutines)
+        await tqdm.gather(*coroutines)
         print("Done!")
         if self.db:
             self.db.end_run(self, True)

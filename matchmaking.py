@@ -1,5 +1,6 @@
 from __future__ import annotations
 from abc import abstractmethod
+import time
 from character import CharacterId
 from random import Random, getrandbits
 from typing import Iterable, Any

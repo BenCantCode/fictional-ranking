@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, TYPE_CHECKING
 import json
 from abc import abstractmethod
+from character import CharacterId
 from type_registrar import Type, TypeRegistrar
 import re
 
@@ -48,6 +49,16 @@ class CharacterFilter(Type):
             return filter_type.from_parameters(object, registrar)
         else:
             raise ValueError()
+
+    # Shims for type checker
+    def __and__(self, other):
+        raise NotImplementedError()
+
+    def __or__(self, other):
+        raise NotImplementedError()
+
+    def __invert__(self):
+        raise NotImplementedError()
 
 
 class OrFilter(CharacterFilter):
@@ -250,6 +261,61 @@ class EverythingFilter(CharacterFilter):
         registrar: CharacterFilterTypeRegistrar,
     ) -> EverythingFilter:
         return EverythingFilter()
+
+
+class RatingFilter(CharacterFilter):
+    """Matches characters based on their rating."""
+
+    TYPE_ID = "rating"
+
+    def __init__(self, threshold: float, ratings: dict[CharacterId, float]):
+        self.threshold = threshold
+        self.valid_ids = [
+            character_id
+            for (character_id, rating) in ratings.items()
+            if rating >= threshold
+        ]
+
+    def ok(self, character_id: CharacterId, source_manager: SourceManager):
+        return character_id in self.valid_ids
+
+    @property
+    def parameters(self):
+        return {"threshold": self.threshold}
+
+    @staticmethod
+    def from_parameters(
+        parameters: dict[str, Any],
+        registrar: CharacterFilterTypeRegistrar,
+    ):
+        raise NotImplementedError("Cannot construct a RatingFilter without ratings.")
+
+
+class LengthFilter(CharacterFilter):
+    """Matches characters based on their abridged article length."""
+
+    TYPE_ID = "rating"
+
+    def __init__(self, threshold: float, ratings: dict[CharacterId, float]):
+        self.threshold = threshold
+
+    def ok(self, character_id: CharacterId, source_manager: SourceManager):
+        # Hopefully this is cached.
+        return (
+            len(source_manager.get_character(character_id).abridged_text())
+            > self.threshold
+        )
+
+    @property
+    def parameters(self):
+        return {"threshold": self.threshold}
+
+    @staticmethod
+    def from_parameters(
+        parameters: dict[str, Any],
+        registrar: CharacterFilterTypeRegistrar,
+    ):
+        raise NotImplementedError("Cannot construct a RatingFilter without ratings.")
 
 
 class CharacterFilterTypeRegistrar(TypeRegistrar[CharacterFilter]):

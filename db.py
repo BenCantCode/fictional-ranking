@@ -204,6 +204,11 @@ class RunsDatabase:
             "{}",
             _OUTCOME_TO_DB[match.outcome] if match.outcome else None,
             match.cost,
+            match_settings=(
+                json.dumps(match.match_settings.to_object())
+                if match.match_settings
+                else "{}"
+            ),
         )
 
     def end_run(self, run: Run, successful: bool) -> RunID:
