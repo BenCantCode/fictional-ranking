@@ -12,6 +12,7 @@ import pickle
 from character import CharacterId, Section, Character
 import wikitextparser as wtp
 from wikitextparser import Template, WikiText, WikiLink
+from wikitextparser._spans import parse_to_spans
 import lzma
 import re
 import zstandard
@@ -221,6 +222,10 @@ class MediaWiki(Source):
     def transform_wikitext(self, title: str, wikitext: WikiText):
         for transformer in self.wikitext_transformers:
             transformer(title, wikitext)
+            # Hack to fix wikitext after transforming
+            wikitext._type_to_spans = parse_to_spans(
+                bytearray(wikitext.string, "ascii", "replace")
+            )
 
     def extract_sections(self, article: WikiArticle):
         parsed = wtp.parse(article.content)
@@ -229,7 +234,9 @@ class MediaWiki(Source):
         sections = []
         found_level = None
         found_priority = self.DEFAULT_SECTION_PRIORITY
+        i = 0
         for section in parsed.get_sections(include_subsections=False):
+            i += 1
             found = False
             if section.title != None:
                 section.title = section.title.strip()
@@ -241,7 +248,10 @@ class MediaWiki(Source):
                 found_level = None
                 found_priority = self.DEFAULT_SECTION_PRIORITY
             sections.append(
-                Section(re.sub("[\n]+", "\n", section.plain_text()), found_priority)
+                Section(
+                    re.sub("[\n]+", "\n", section.plain_text()),
+                    found_priority,
+                )
             )
         sections[0].text = "==Introduction==\n" + sections[0].text
         sections[0].priority = self.SECTION_PRIORITY["introduction"]
@@ -258,6 +268,10 @@ class MediaWiki(Source):
         article = self.get_article(character_name)
         if article == None:
             raise NotACharacterException(character_name)
+        while article.content.startswith("#REDIRECT"):
+            article = self.get_article(wtp.parse(article.content).wikilinks[0].title)
+            if article == None:
+                raise ValueError("Redirect goes to blank page!")
         return self.character_from_article(article)
 
     def article_filter(self, article: WikiArticle):

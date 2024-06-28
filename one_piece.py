@@ -21,6 +21,17 @@ DEFAULT_TAB_SUBPAGES = set(
     ]
 )
 
+# The "List of Canon Characters" isn't perfect.
+IGNORE_CHARACTER_NAMES = [
+    "Impel Down",
+    "Mock Town",
+    "Rocks Pirates",
+    "Belly",
+    "Sapoten Graveyard",
+    "Rock",
+]
+INCLUDE_CHARACTER_NAMES = []
+
 
 class OnePieceWiki(MediaWiki):
     SOURCE_ID = "one_piece"
@@ -139,8 +150,14 @@ class OnePieceWiki(MediaWiki):
             )[1]
         wikitext.string = wikitext.string + combine_subpages(1, subpages)  # type: ignore
 
+    @wikitext_transformer
+    def expand_nihongo(self, title: str, wikitext: WikiText):
+        for template in wikitext.templates:
+            if template.normal_name() == "nihongo":
+                template.string = template.arguments[0].value
+
     def all_character_names(self) -> Iterable[str]:
-        character_names = []
+        character_names = set()
         for character_list in self.articles_starting_with(
             "List of Canon Characters/Names"
         ):
@@ -157,8 +174,11 @@ class OnePieceWiki(MediaWiki):
             data = parsed.get_tables()[0].data()
             for row in data:
                 link = wtp.parse(row[1]).wikilinks[0]
-                if not link.fragment:
-                    character_names.append(link.title)
+                character_names.add(link.title)
+        for character in IGNORE_CHARACTER_NAMES:
+            character_names.discard(character)
+        for character in INCLUDE_CHARACTER_NAMES:
+            character_names.add(character)
         return character_names
 
     def all_characters(self) -> Iterable[Character]:
