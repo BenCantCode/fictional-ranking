@@ -156,9 +156,9 @@ class OnePieceWiki(MediaWiki):
             )
             data = parsed.get_tables()[0].data()
             for row in data:
-                character_names.append(
-                    wtp.parse(row[1]).wikilinks[0].target.split("#")[0]
-                )
+                link = wtp.parse(row[1]).wikilinks[0]
+                if not link.fragment:
+                    character_names.append(link.title)
         return character_names
 
     def all_characters(self) -> Iterable[Character]:
