@@ -4,7 +4,6 @@ from aiolimiter import AsyncLimiter
 
 
 from character import CharacterId
-from character_filter import CharacterFilterTypeRegistrar
 from evaluate import Evaluator
 from generator import Generator
 from typing import TYPE_CHECKING, Any
@@ -18,8 +17,10 @@ from tqdm.asyncio import tqdm
 from math import ceil
 import logging
 
-from match_filter import MatchFilterTypeRegistrar
-from matchmaking import MatchmakerTypeRegistrar
+from character_filter import CharacterFilter
+from match_filter import MatchFilter
+from matchmaking import Matchmaker
+from type_registrar import TypeRegistrar
 
 logger = logging.getLogger(__name__)
 
@@ -45,9 +46,9 @@ class RunParameters:
     @staticmethod
     def from_object(
         object: dict[str, Any],
-        character_filter_type_registrar: CharacterFilterTypeRegistrar,
-        matchmaker_type_registrar: MatchmakerTypeRegistrar,
-        match_filter_type_registrar: MatchFilterTypeRegistrar,
+        character_filter_type_registrar: TypeRegistrar[CharacterFilter],
+        matchmaker_type_registrar: TypeRegistrar[Matchmaker],
+        match_filter_type_registrar: TypeRegistrar[MatchFilter],
     ):
         if object["generator"]:
             try:

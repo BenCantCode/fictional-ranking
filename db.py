@@ -1,5 +1,5 @@
 import sqlite3
-from character_filter import CharacterFilterTypeRegistrar
+from character_filter import CHARACTER_FILTER_TYPE_REGISTRAR, CharacterFilter
 from config import *
 from argparse import ArgumentParser
 import json
@@ -7,13 +7,14 @@ from character import Character, CharacterId
 from datetime import datetime
 from enum import Enum
 from match import MatchSettings, PreparedMatch, MatchResult, MatchCharacterMeta, Outcome
-from match_filter import MatchFilterTypeRegistrar
-from matchmaking import MatchmakerTypeRegistrar
+from match_filter import MATCH_FILTER_TYPE_REGISTRAR, MatchFilter
+from matchmaking import MATCHMAKER_TYPE_REGISTRAR, Matchmaker
 from run import Run, RunParameters
 
 from typing import Iterable, Any, Literal, TypeAlias, TypedDict, TYPE_CHECKING
 
 from source_manager import SourceManager
+from type_registrar import TypeRegistrar
 
 DB_FORMAT = 1
 
@@ -277,9 +278,9 @@ class RunsDatabase:
         self,
         row: dict[str, Any],
         source_manager: SourceManager,
-        character_filter_type_registrar: CharacterFilterTypeRegistrar,
-        matchmaker_type_registrar: MatchmakerTypeRegistrar,
-        match_filter_type_registrar: MatchFilterTypeRegistrar,
+        character_filter_type_registrar: TypeRegistrar[CharacterFilter],
+        matchmaker_type_registrar: TypeRegistrar[Matchmaker],
+        match_filter_type_registrar: TypeRegistrar[MatchFilter],
         include_db=True,
     ) -> Run:
         params = RunParameters.from_object(
@@ -311,9 +312,15 @@ class RunsDatabase:
         self,
         run_id: RunID,
         source_manager: SourceManager,
-        character_filter_type_registrar: CharacterFilterTypeRegistrar,
-        matchmaker_type_registrar: MatchmakerTypeRegistrar,
-        match_filter_type_registrar: MatchFilterTypeRegistrar,
+        character_filter_type_registrar: TypeRegistrar[
+            CharacterFilter
+        ] = CHARACTER_FILTER_TYPE_REGISTRAR,
+        matchmaker_type_registrar: TypeRegistrar[
+            Matchmaker
+        ] = MATCHMAKER_TYPE_REGISTRAR,
+        match_filter_type_registrar: TypeRegistrar[
+            MatchFilter
+        ] = MATCH_FILTER_TYPE_REGISTRAR,
         include_db: bool = True,
     ):
         """Fully recreate a run from the database, including unfinished matches. May require re-parsing characters."""
@@ -333,9 +340,15 @@ class RunsDatabase:
         self,
         run_name: str,
         source_manager: SourceManager,
-        character_filter_type_registrar: CharacterFilterTypeRegistrar,
-        matchmaker_type_registrar: MatchmakerTypeRegistrar,
-        match_filter_type_registrar: MatchFilterTypeRegistrar,
+        character_filter_type_registrar: TypeRegistrar[
+            CharacterFilter
+        ] = CHARACTER_FILTER_TYPE_REGISTRAR,
+        matchmaker_type_registrar: TypeRegistrar[
+            Matchmaker
+        ] = MATCHMAKER_TYPE_REGISTRAR,
+        match_filter_type_registrar: TypeRegistrar[
+            MatchFilter
+        ] = MATCH_FILTER_TYPE_REGISTRAR,
         include_db: bool = True,
     ):
         """Fully recreate a run from the database, including unfinished matches. May require re-parsing characters."""

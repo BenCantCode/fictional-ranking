@@ -8,9 +8,10 @@ from match import MatchResult, Outcome, PreparedMatch
 from type_registrar import Type, TypeRegistrar
 
 
-class MatchFilter(Type):
-    TYPE_ID: str
+MATCH_FILTER_TYPE_REGISTRAR = TypeRegistrar["MatchFilter"]()
 
+
+class MatchFilter(Type):
     @abstractmethod
     def ok(
         self,
@@ -28,7 +29,7 @@ class MatchFilter(Type):
     @staticmethod
     @abstractmethod
     def from_parameters(
-        parameters: dict[str, Any], registrar: MatchFilterTypeRegistrar
+        parameters: dict[str, Any], registrar: TypeRegistrar[MatchFilter]
     ) -> MatchFilter:
         """Instantiate the filter by deserializing the dictionary of parameters previously serialized in the `parameters` method."""
         pass
@@ -40,7 +41,7 @@ class MatchFilter(Type):
     @staticmethod
     def from_object(
         object: dict[str, Any],
-        registrar: MatchFilterTypeRegistrar,
+        registrar: TypeRegistrar[MatchFilter],
     ) -> MatchFilter:
         """Instantiate a filter from a JSON-deserialized object. Don't override this."""
         return registrar.get_type(object["type"]).from_parameters(object, registrar)
@@ -56,9 +57,8 @@ class MatchFilter(Type):
         raise NotImplementedError()
 
 
+@MATCH_FILTER_TYPE_REGISTRAR.register("or")
 class OrFilter(MatchFilter):
-    TYPE_ID = "or"
-
     def __init__(self, *subfilters: MatchFilter):
         self.subfilters = list(subfilters)
 
@@ -68,7 +68,7 @@ class OrFilter(MatchFilter):
 
     @staticmethod
     def from_parameters(
-        parameters: dict[str, Any], registrar: MatchFilterTypeRegistrar
+        parameters: dict[str, Any], registrar: TypeRegistrar[MatchFilter]
     ) -> MatchFilter:
         return OrFilter(
             *[
@@ -88,9 +88,8 @@ class OrFilter(MatchFilter):
         return False
 
 
+@MATCH_FILTER_TYPE_REGISTRAR.register("and")
 class AndFilter(MatchFilter):
-    TYPE_ID = "and"
-
     def __init__(self, *subfilters: MatchFilter):
         self.subfilters = list(subfilters)
 
@@ -100,7 +99,7 @@ class AndFilter(MatchFilter):
 
     @staticmethod
     def from_parameters(
-        parameters: dict[str, Any], registrar: MatchFilterTypeRegistrar
+        parameters: dict[str, Any], registrar: TypeRegistrar[MatchFilter]
     ) -> MatchFilter:
         return AndFilter(
             *[
@@ -120,9 +119,8 @@ class AndFilter(MatchFilter):
         return True
 
 
+@MATCH_FILTER_TYPE_REGISTRAR.register("invert")
 class InvertFilter(MatchFilter):
-    TYPE_ID = "invert"
-
     def __init__(self, subfilter: MatchFilter):
         self.subfilter = subfilter
 
@@ -132,7 +130,7 @@ class InvertFilter(MatchFilter):
 
     @staticmethod
     def from_parameters(
-        parameters: dict[str, Any], registrar: MatchFilterTypeRegistrar
+        parameters: dict[str, Any], registrar: TypeRegistrar[MatchFilter]
     ) -> MatchFilter:
         return InvertFilter(MatchFilter.from_object(parameters["subfilter"], registrar))
 
@@ -144,7 +142,7 @@ class InvertFilter(MatchFilter):
         return not self.subfilter.ok(match, matches)
 
 
-def or_filter(a: MatchFilter, b: MatchFilter):
+def or_filter(a, b):
     if isinstance(a, OrFilter):
         a.subfilters.append(b)
         return a
@@ -158,7 +156,7 @@ def or_filter(a: MatchFilter, b: MatchFilter):
 MatchFilter.__or__ = or_filter  # type: ignore
 
 
-def and_filter(a: MatchFilter, b: MatchFilter):
+def and_filter(a, b):
     if isinstance(a, AndFilter):
         a.subfilters.append(b)
         return a
@@ -179,8 +177,8 @@ def invert_filter(a: MatchFilter):
 MatchFilter.__invert__ = invert_filter  # type: ignore
 
 
+@MATCH_FILTER_TYPE_REGISTRAR.register("duplicate_run")
 class DuplicateMatchInRunFilter(MatchFilter):
-    TYPE_ID = "duplicate_run"
 
     def __init__(self, order_dependent=False):
         self.order_dependent = order_dependent
@@ -191,7 +189,7 @@ class DuplicateMatchInRunFilter(MatchFilter):
 
     @staticmethod
     def from_parameters(
-        parameters: dict[str, Any], registrar: MatchFilterTypeRegistrar
+        parameters: dict[str, Any], registrar: TypeRegistrar[MatchFilter]
     ) -> MatchFilter:
         return DuplicateMatchInRunFilter(parameters["order_dependent"])
 
@@ -217,9 +215,8 @@ class DuplicateMatchInRunFilter(MatchFilter):
         return False
 
 
+@MATCH_FILTER_TYPE_REGISTRAR.register("duplicate_prior_run")
 class DuplicateMatchInPriorRunFilter(MatchFilter):
-    TYPE_ID = "duplicate_prior_run"
-
     def __init__(
         self,
         results: list[MatchResult],
@@ -243,11 +240,12 @@ class DuplicateMatchInPriorRunFilter(MatchFilter):
         return {
             "order_dependent": self.order_dependent,
             "ignore_unfinished": self.ignore_unfinished,
+            "threshold": self.threshold,
         }
 
     @staticmethod
     def from_parameters(
-        parameters: dict[str, Any], registrar: MatchFilterTypeRegistrar
+        parameters: dict[str, Any], registrar: TypeRegistrar[MatchFilter]
     ) -> MatchFilter:
         # TODO: Requires results, but none can be obtained from the object alone.
         raise NotImplementedError()
@@ -273,16 +271,15 @@ class DuplicateMatchInPriorRunFilter(MatchFilter):
         return False
 
 
+@MATCH_FILTER_TYPE_REGISTRAR.register("self")
 class SelfMatchFilter(MatchFilter):
-    TYPE_ID = "self"
-
     @property
     def parameters(self):
         return {}
 
     @staticmethod
     def from_parameters(
-        parameters: dict[str, Any], registrar: MatchFilterTypeRegistrar
+        parameters: dict[str, Any], registrar: TypeRegistrar[MatchFilter]
     ) -> SelfMatchFilter:
         return SelfMatchFilter()
 
@@ -294,10 +291,9 @@ class SelfMatchFilter(MatchFilter):
         return potential_match[0] == potential_match[1]
 
 
+@MATCH_FILTER_TYPE_REGISTRAR.register("character_matches_threshold")
 class CharacterMatchesThresholdFilter(MatchFilter):
     """Tests the number of matches in the current run that Character B is in."""
-
-    TYPE_ID = "character_matches_threshold"
 
     def __init__(self, threshold: int):
         self.threshold = threshold
@@ -308,7 +304,7 @@ class CharacterMatchesThresholdFilter(MatchFilter):
 
     @staticmethod
     def from_parameters(
-        parameters: dict[str, Any], registrar: MatchFilterTypeRegistrar
+        parameters: dict[str, Any], registrar: TypeRegistrar[MatchFilter]
     ) -> CharacterMatchesThresholdFilter:
         return CharacterMatchesThresholdFilter(parameters["threshold"])
 
@@ -325,15 +321,3 @@ class CharacterMatchesThresholdFilter(MatchFilter):
                 if b_matches > self.threshold:
                     return True
         return False
-
-
-class MatchFilterTypeRegistrar(TypeRegistrar[MatchFilter]):
-    DEFAULT_TYPES: list[type[MatchFilter]] = [
-        OrFilter,
-        AndFilter,
-        InvertFilter,
-        DuplicateMatchInRunFilter,
-        DuplicateMatchInPriorRunFilter,
-        SelfMatchFilter,
-        CharacterMatchesThresholdFilter,
-    ]

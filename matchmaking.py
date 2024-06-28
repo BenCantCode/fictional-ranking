@@ -10,6 +10,8 @@ from type_registrar import Type, TypeRegistrar
 import json
 from config import DEFAULT_RATING
 
+MATCHMAKER_TYPE_REGISTRAR = TypeRegistrar["Matchmaker"]()
+
 
 class Matchmaker(Type):
     TYPE_ID: str
@@ -35,7 +37,7 @@ class Matchmaker(Type):
     @staticmethod
     def from_object(
         object: dict[str, Any],
-        registrar: MatchmakerTypeRegistrar,
+        registrar: TypeRegistrar[Matchmaker],
     ) -> Matchmaker:
         """Instantiate a filter from a JSON-deserialized object. Don't override this."""
         return registrar.get_type(object["type"]).from_parameters(object, registrar)
@@ -43,14 +45,13 @@ class Matchmaker(Type):
     @staticmethod
     @abstractmethod
     def from_parameters(
-        parameters: dict[str, Any], registrar: MatchmakerTypeRegistrar
+        parameters: dict[str, Any], registrar: TypeRegistrar[Matchmaker]
     ) -> Matchmaker:
         raise NotImplementedError()
 
 
+@MATCHMAKER_TYPE_REGISTRAR.register("random")
 class RandomMatchmaker(Matchmaker):
-    TYPE_ID = "random"
-
     def __init__(self, seed: int | None = None):
         if seed == None:
             seed = getrandbits(32)
@@ -79,7 +80,7 @@ class RandomMatchmaker(Matchmaker):
 
     @staticmethod
     def from_parameters(
-        parameters: dict[str, Any], registrar: MatchmakerTypeRegistrar
+        parameters: dict[str, Any], registrar: TypeRegistrar[Matchmaker]
     ) -> Matchmaker:
         return RandomMatchmaker(parameters["seed"])
 
@@ -88,9 +89,8 @@ class RandomMatchmaker(Matchmaker):
         return {"seed": self.seed}
 
 
+@MATCHMAKER_TYPE_REGISTRAR.register("powermatched")
 class PowermatchingMatchmaker(Matchmaker):
-    TYPE_ID = "powermatched"
-
     def __init__(self, ratings: dict[CharacterId, float]):
         self.ratings = ratings
 
@@ -116,14 +116,10 @@ class PowermatchingMatchmaker(Matchmaker):
 
     @staticmethod
     def from_parameters(
-        parameters: dict[str, Any], registrar: MatchmakerTypeRegistrar
+        parameters: dict[str, Any], registrar: TypeRegistrar[Matchmaker]
     ) -> Matchmaker:
         raise NotImplementedError()
 
     @property
     def parameters(self) -> dict[str, Any]:
         return {}
-
-
-class MatchmakerTypeRegistrar(TypeRegistrar[Matchmaker]):
-    DEFAULT_TYPES: list[type[Matchmaker]] = [RandomMatchmaker, PowermatchingMatchmaker]

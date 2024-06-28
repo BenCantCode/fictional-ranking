@@ -1,6 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import TypeVar, Generic, Iterable, cast, TYPE_CHECKING
+from typing import Any, TypeVar, Generic, Iterable, cast, TYPE_CHECKING, Callable
 
 
 class UnknownType(Exception):
@@ -10,37 +10,26 @@ class UnknownType(Exception):
 class Type(ABC):
     TYPE_ID: str
 
-    if not TYPE_CHECKING:
-        # Hack to force TYPE_ID to be overridden
-        @property
-        @abstractmethod
-        def TYPE_ID(self) -> str:
-            raise NotImplementedError()
-
 
 T = TypeVar("T", bound=Type)
 
 
 class TypeRegistrar(Generic[T]):
-    # Hack to force TYPE to be overridden
-
-    DEFAULT_TYPES: list[type[T]] = []
-
     def __init__(
         self,
-        types: list[type[T]] = [],
-        include_default: bool = True,
     ):
-        if include_default:
-            types.extend(self.DEFAULT_TYPES)
-        self.types = dict((type.TYPE_ID, type) for type in types)
+        self.types: dict[str, type[T]] = dict()
 
-    def add_type(self, type: type[T]):
-        self.types[type.TYPE_ID] = type
+    def register(self, id: str):
+        def registered(cls: type[T]) -> Any:
+            cls.TYPE_ID = id
+            self.types[id] = cls
+            return cls
 
-    def add_types(self, types: Iterable[type[T]]):
-        for type in types:
-            self.add_type(type)
+        return registered
+
+    def add_type(self, id: str, type: type[T]):
+        self.types[id] = type
 
     def get_type(self, type_id: str) -> type[T]:
         type = self.types.get(type_id)

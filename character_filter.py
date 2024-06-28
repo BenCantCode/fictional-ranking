@@ -11,12 +11,12 @@ if TYPE_CHECKING:
     from character import CharacterId
     from source_manager import SourceManager
 
+CHARACTER_FILTER_TYPE_REGISTRAR = TypeRegistrar["CharacterFilter"]()
+
 
 class CharacterFilter(Type):
-    TYPE_ID: str
-
     @abstractmethod
-    def ok(self, character_id: CharacterId, source_manager: SourceManager):
+    def ok(self, character_id: CharacterId, source_manager: SourceManager) -> bool:
         raise NotImplementedError()
 
     @property
@@ -29,7 +29,7 @@ class CharacterFilter(Type):
     @abstractmethod
     def from_parameters(
         parameters: dict[str, Any],
-        registrar: CharacterFilterTypeRegistrar,
+        registrar: TypeRegistrar[CharacterFilter],
     ) -> CharacterFilter:
         """Instantiate the filter by deserializing the dictionary of parameters previously serialized in the `parameters` method."""
         raise NotImplementedError()
@@ -41,7 +41,7 @@ class CharacterFilter(Type):
     @staticmethod
     def from_object(
         object: dict[str, Any],
-        registrar: CharacterFilterTypeRegistrar,
+        registrar: TypeRegistrar[CharacterFilter],
     ) -> CharacterFilter:
         """Instantiate a filter from a JSON-deserialized object. Don't override this."""
         filter_type = registrar.get_type(object["type"])
@@ -51,19 +51,18 @@ class CharacterFilter(Type):
             raise ValueError()
 
     # Shims for type checker
-    def __and__(self, other):
+    def __and__(self, other) -> CharacterFilter:
         raise NotImplementedError()
 
-    def __or__(self, other):
+    def __or__(self, other) -> CharacterFilter:
         raise NotImplementedError()
 
-    def __invert__(self):
+    def __invert__(self) -> CharacterFilter:
         raise NotImplementedError()
 
 
+@CHARACTER_FILTER_TYPE_REGISTRAR.register("or")
 class OrFilter(CharacterFilter):
-    TYPE_ID = "or"
-
     def __init__(self, *subfilters: CharacterFilter):
         self.subfilters = list(subfilters)
 
@@ -79,8 +78,8 @@ class OrFilter(CharacterFilter):
 
     @staticmethod
     def from_parameters(
-        parameters: dict[str, Any], registrar: CharacterFilterTypeRegistrar
-    ) -> CharacterFilter:
+        parameters: dict[str, Any], registrar: TypeRegistrar[CharacterFilter]
+    ) -> OrFilter:
         return OrFilter(
             *[
                 CharacterFilter.from_object(subfilter_object, registrar)
@@ -89,8 +88,8 @@ class OrFilter(CharacterFilter):
         )
 
 
+@CHARACTER_FILTER_TYPE_REGISTRAR.register("and")
 class AndFilter(CharacterFilter):
-    TYPE_ID = "and"
 
     def __init__(self, *subfilters: CharacterFilter):
         self.subfilters = list(subfilters)
@@ -107,9 +106,9 @@ class AndFilter(CharacterFilter):
 
     @staticmethod
     def from_parameters(
-        parameters: dict[str, Any], registrar: CharacterFilterTypeRegistrar
-    ) -> CharacterFilter:
-        return OrFilter(
+        parameters: dict[str, Any], registrar: TypeRegistrar[CharacterFilter]
+    ) -> AndFilter:
+        return AndFilter(
             *[
                 CharacterFilter.from_object(subfilter_object, registrar)
                 for subfilter_object in parameters["subfilters"]
@@ -117,9 +116,8 @@ class AndFilter(CharacterFilter):
         )
 
 
+@CHARACTER_FILTER_TYPE_REGISTRAR.register("invert")
 class InvertFilter(CharacterFilter):
-    TYPE_ID = "invert"
-
     def __init__(self, subfilter: CharacterFilter):
         self.subfilter = subfilter
 
@@ -132,14 +130,14 @@ class InvertFilter(CharacterFilter):
 
     @staticmethod
     def from_parameters(
-        parameters: dict[str, Any], registrar: CharacterFilterTypeRegistrar
-    ) -> CharacterFilter:
+        parameters: dict[str, Any], registrar: TypeRegistrar[CharacterFilter]
+    ) -> InvertFilter:
         return InvertFilter(
             CharacterFilter.from_object(parameters["subfilter"], registrar)
         )
 
 
-def or_filter(a: CharacterFilter, b: CharacterFilter):
+def _or_filter(a, b) -> OrFilter:
     if isinstance(a, OrFilter):
         a.subfilters.append(b)
         return a
@@ -150,10 +148,10 @@ def or_filter(a: CharacterFilter, b: CharacterFilter):
         return OrFilter(a, b)
 
 
-CharacterFilter.__or__ = or_filter  # type: ignore
+CharacterFilter.__or__ = _or_filter  # type: ignore
 
 
-def and_filter(a: CharacterFilter, b: CharacterFilter):
+def _and_filter(a, b):
     if isinstance(a, AndFilter):
         a.subfilters.append(b)
         return a
@@ -164,7 +162,7 @@ def and_filter(a: CharacterFilter, b: CharacterFilter):
         return AndFilter(a, b)
 
 
-CharacterFilter.__and__ = and_filter  # type: ignore
+CharacterFilter.__and__ = _and_filter  # type: ignore
 
 
 def invert_filter(a: CharacterFilter):
@@ -174,10 +172,9 @@ def invert_filter(a: CharacterFilter):
 CharacterFilter.__invert__ = invert_filter  # type: ignore
 
 
+@CHARACTER_FILTER_TYPE_REGISTRAR.register("character_id")
 class CharacterIdFilter(CharacterFilter):
     """Matches specific characters."""
-
-    TYPE_ID = "character_id"
 
     def __init__(self, character_ids: list[CharacterId]):
         self.character_ids = character_ids
@@ -194,17 +191,16 @@ class CharacterIdFilter(CharacterFilter):
 
     @staticmethod
     def from_parameters(
-        parameters: dict[str, Any], registrar: CharacterFilterTypeRegistrar
+        parameters: dict[str, Any], registrar: TypeRegistrar[CharacterFilter]
     ) -> CharacterIdFilter:
         return CharacterIdFilter(
             [CharacterId.from_str(id) for id in parameters["characters"]]
         )
 
 
+@CHARACTER_FILTER_TYPE_REGISTRAR.register("character_name")
 class CharacterNameFilter(CharacterFilter):
     """Matches a characters name if a provided regex matches their entire name."""
-
-    TYPE_ID = "character_name"
 
     def __init__(self, pattern: re.Pattern):
         self.pattern = pattern
@@ -218,15 +214,14 @@ class CharacterNameFilter(CharacterFilter):
 
     @staticmethod
     def from_parameters(
-        parameters: dict[str, Any], registrar: CharacterFilterTypeRegistrar
+        parameters: dict[str, Any], registrar: TypeRegistrar[CharacterFilter]
     ) -> CharacterNameFilter:
         return CharacterNameFilter(re.compile(parameters["pattern"]))
 
 
+@CHARACTER_FILTER_TYPE_REGISTRAR.register("source")
 class SourceFilter(CharacterFilter):
     """Matches characters from specific sources."""
-
-    TYPE_ID = "source"
 
     source_ids: list[str]
 
@@ -245,10 +240,9 @@ class SourceFilter(CharacterFilter):
         return SourceFilter(parameters["sources"])
 
 
+@CHARACTER_FILTER_TYPE_REGISTRAR.register("everything")
 class EverythingFilter(CharacterFilter):
     """Matches everything."""
-
-    TYPE_ID = "everything"
 
     def ok(self, character_id: CharacterId, source_manager: SourceManager):
         return True
@@ -260,15 +254,14 @@ class EverythingFilter(CharacterFilter):
     @staticmethod
     def from_parameters(
         parameters: dict[str, Any],
-        registrar: CharacterFilterTypeRegistrar,
+        registrar: TypeRegistrar[CharacterFilter],
     ) -> EverythingFilter:
         return EverythingFilter()
 
 
+@CHARACTER_FILTER_TYPE_REGISTRAR.register("rating")
 class RatingFilter(CharacterFilter):
     """Matches characters based on their rating."""
-
-    TYPE_ID = "rating"
 
     def __init__(self, threshold: float, ratings: dict[CharacterId, float]):
         self.threshold = threshold
@@ -288,15 +281,14 @@ class RatingFilter(CharacterFilter):
     @staticmethod
     def from_parameters(
         parameters: dict[str, Any],
-        registrar: CharacterFilterTypeRegistrar,
+        registrar: TypeRegistrar[CharacterFilter],
     ):
         raise NotImplementedError("Cannot construct a RatingFilter without ratings.")
 
 
+@CHARACTER_FILTER_TYPE_REGISTRAR.register("length")
 class LengthFilter(CharacterFilter):
     """Matches characters based on their abridged article length."""
-
-    TYPE_ID = "rating"
 
     def __init__(self, threshold: float, ratings: dict[CharacterId, float]):
         self.threshold = threshold
@@ -315,21 +307,6 @@ class LengthFilter(CharacterFilter):
     @staticmethod
     def from_parameters(
         parameters: dict[str, Any],
-        registrar: CharacterFilterTypeRegistrar,
+        registrar: TypeRegistrar[CharacterFilter],
     ):
         raise NotImplementedError("Cannot construct a RatingFilter without ratings.")
-
-
-class CharacterFilterTypeRegistrar(TypeRegistrar[CharacterFilter]):
-    DEFAULT_TYPES: list[type[CharacterFilter]] = [
-        AndFilter,
-        OrFilter,
-        InvertFilter,
-        CharacterFilter,
-        SourceFilter,
-        CharacterNameFilter,
-        EverythingFilter,
-        CharacterIdFilter,
-        RatingFilter,
-        LengthFilter,
-    ]
