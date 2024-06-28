@@ -3,14 +3,9 @@ from typing import Any, TYPE_CHECKING, Iterable
 from match import PreparedMatch
 from source_manager import SourceManager
 from character import CharacterId
-from character_filter import CharacterFilter
-from match_filter import MatchFilter
-from matchmaking import Matchmaker
-from config import (
-    CHARACTER_FILTER_TYPE_REGISTRAR,
-    MATCH_FILTER_TYPE_REGISTRAR,
-    MATCHMAKER_TYPE_REGISTRAR,
-)
+from character_filter import CharacterFilter, CharacterFilterTypeRegistrar
+from match_filter import MatchFilter, MatchFilterTypeRegistrar
+from matchmaking import Matchmaker, MatchmakerTypeRegistrar
 
 if TYPE_CHECKING:
     from run import Run
@@ -33,9 +28,9 @@ class Generator:
     @staticmethod
     def from_object(
         object: dict[str, Any],
-        character_filter_type_registrar=CHARACTER_FILTER_TYPE_REGISTRAR,
-        matchmaker_type_registrar=MATCHMAKER_TYPE_REGISTRAR,
-        match_filter_type_registrar=MATCH_FILTER_TYPE_REGISTRAR,
+        character_filter_type_registrar: CharacterFilterTypeRegistrar,
+        matchmaker_type_registrar: MatchmakerTypeRegistrar,
+        match_filter_type_registrar: MatchFilterTypeRegistrar,
     ):
         return Generator(
             CharacterFilter.from_object(

@@ -1,11 +1,14 @@
 import sqlite3
+from character_filter import CharacterFilterTypeRegistrar
 from config import *
 from argparse import ArgumentParser
 import json
 from character import Character, CharacterId
 from datetime import datetime
 from enum import Enum
-from match import PreparedMatch, MatchResult, MatchCharacterMeta, Outcome
+from match import MatchSettings, PreparedMatch, MatchResult, MatchCharacterMeta, Outcome
+from match_filter import MatchFilterTypeRegistrar
+from matchmaking import MatchmakerTypeRegistrar
 from run import Run, RunParameters
 
 from typing import Iterable, Any, Literal, TypeAlias, TypedDict, TYPE_CHECKING
@@ -43,6 +46,7 @@ def _raw_result_to_result(row: sqlite3.Row) -> MatchResult:
         ),
         _DB_TO_OUTCOME[row["outcome"]],
         row["cost"],
+        MatchSettings.from_object(json.loads(row["match_settings"])),
     )
 
 
@@ -270,9 +274,20 @@ class RunsDatabase:
             yield _raw_result_to_result(row)
 
     def _row_to_run(
-        self, row: dict[str, Any], source_manager: SourceManager, include_db=True
+        self,
+        row: dict[str, Any],
+        source_manager: SourceManager,
+        character_filter_type_registrar: CharacterFilterTypeRegistrar,
+        matchmaker_type_registrar: MatchmakerTypeRegistrar,
+        match_filter_type_registrar: MatchFilterTypeRegistrar,
+        include_db=True,
     ) -> Run:
-        params = RunParameters.from_object(json.loads(row["run_params"]))
+        params = RunParameters.from_object(
+            json.loads(row["run_params"]),
+            character_filter_type_registrar,
+            matchmaker_type_registrar,
+            match_filter_type_registrar,
+        )
         results = list(self.get_results(run_id=row["run_id"], outcome="finished"))
         remaining_matches = [
             result.reprepare(
@@ -293,22 +308,48 @@ class RunsDatabase:
         )
 
     def get_run_by_id(
-        self, run_id: RunID, source_manager: SourceManager, include_db: bool = True
+        self,
+        run_id: RunID,
+        source_manager: SourceManager,
+        character_filter_type_registrar: CharacterFilterTypeRegistrar,
+        matchmaker_type_registrar: MatchmakerTypeRegistrar,
+        match_filter_type_registrar: MatchFilterTypeRegistrar,
+        include_db: bool = True,
     ):
         """Fully recreate a run from the database, including unfinished matches. May require re-parsing characters."""
         cur = self.con.cursor()
         cur.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,))
         row = cur.fetchone()
-        return self._row_to_run(row, source_manager, include_db)
+        return self._row_to_run(
+            row,
+            source_manager,
+            character_filter_type_registrar,
+            matchmaker_type_registrar,
+            match_filter_type_registrar,
+            include_db,
+        )
 
     def get_run_by_name(
-        self, run_name: str, source_manager: SourceManager, include_db: bool = True
+        self,
+        run_name: str,
+        source_manager: SourceManager,
+        character_filter_type_registrar: CharacterFilterTypeRegistrar,
+        matchmaker_type_registrar: MatchmakerTypeRegistrar,
+        match_filter_type_registrar: MatchFilterTypeRegistrar,
+        include_db: bool = True,
     ):
         """Fully recreate a run from the database, including unfinished matches. May require re-parsing characters."""
         cur = self.con.cursor()
         cur.execute("SELECT * FROM runs WHERE run_name = ?", (run_name,))
         row = cur.fetchone()
-        return self._row_to_run(row, source_manager, include_db)
+        return self._row_to_run(
+            row,
+            source_manager,
+            character_filter_type_registrar,
+            matchmaker_type_registrar,
+            match_filter_type_registrar,
+            include_db,
+        )
 
 
 if __name__ == "__main__":

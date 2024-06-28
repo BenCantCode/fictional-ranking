@@ -67,22 +67,22 @@ Format this part of your response like so:
 
 
 2.
-For each character, consider the three most important abilities that character possesses that would affect their performance in a one-on-one duel. If one ability can be split into multiple abilities or items, those abilities or items should be listed separately. Do not combine them into one ability. After naming an ability, use short quotes from the wiki to describe it. Next, highlight any aspects of the ability mentioned in the quotes that are irrelevant to a one-on-one duel against this specific opponent by highlighting the presence or absence of something on the opponent's wiki page. Here's a hint: if the ability only effects opponents with a certain trait, and that the opponent doesn't have that trait, it is probably irrelevant. Afterwards, do the same for the parts of the ability that are relevant. Finally, write several sentences on the potential significance of the ability to the outcome of the duel, referencing only information from the quotes you previously cited.
+For each character, consider the three most important abilities that character possesses that would affect their performance in a one-on-one duel. If one ability can be split into multiple abilities or items, those abilities or items should be listed separately. Do not combine them into one ability. After naming an ability, describe it using three facts paraphrased from the wiki (do not quote anything directly). Next, highlight any aspects of the ability that are irrelevant to a one-on-one duel against this specific opponent by highlighting the presence or absence of something on the opponent's wiki page. Here's a hint: if the ability only effects opponents with a certain trait, and that the opponent doesn't have that trait, it is probably irrelevant. Afterwards, do the same for the parts of the ability that are relevant. Finally, write several sentences on the potential significance of the ability to the outcome of the duel, referencing only information from the facts you previously came up with.
 
 Format this part of your response like so:
 
 # Abilities
 ## [Character's Name]
 ### [Ability's Name]
-#### Quotes
-"[A sentence paraphrased from the character's wiki page]"
-"[A sentence paraphrased from the character's wiki page]"
-"[A sentence paraphrased from the character's wiki page]"
+#### Facts
+"[A fact paraphrased from the character's wiki page]"
+"[A fact paraphrased from the character's wiki page]"
+"[A fact paraphrased from the character's wiki page]"
 #### Applicability to Opponent
 ##### Irrelevant Aspects
-[Explain which of the quotes are wholly or partially irrelevant to a duel against this specific opponent using evidence from the opponent's wiki page.]
+[Explain which of the facts are wholly or partially irrelevant to a duel against this specific opponent using evidence from the opponent's wiki page.]
 ##### Relevant Aspects
-[Explain which of the quotes are wholly or partially relevant to a duel against this specific opponent using evidence from the opponent's wiki page.]
+[Explain which of the facts are wholly or partially relevant to a duel against this specific opponent using evidence from the opponent's wiki page.]
 #### Significance
 [Speculate about the ability's significance to the duel's outcome, taking into account only the aspects of the ability that are relevant to this duel.]
 ### [Other Ability's Name]

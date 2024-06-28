@@ -2,7 +2,7 @@ from __future__ import annotations
 from aiolimiter import AsyncLimiter
 from jinja2 import FileSystemLoader, Environment, BaseLoader
 from config import *
-from character import Character
+from character import Character, CharacterId
 import toml
 from exceptions import *
 import os.path
@@ -18,6 +18,7 @@ from litellm import (
     Router,
     APIConnectionError,
     RateLimitError,
+    BadRequestError,
 )
 from os.path import join
 import logging
@@ -32,52 +33,61 @@ logger = logging.getLogger(__name__)
 class Evaluator:
     def __init__(
         self,
-        prompt: str = PROMPT,
-        template: str | None = None,
+        prompt_file: str | None = PROMPT,
+        prompt_raw: str | None = None,
         winner_prefix: str | None = None,
         template_folder: str = PROMPTS_FOLDER,
         stop: list[str] = [],
-        information: dict | None = None,
         information_file: str = INFORMATION_FILE,
+        information_raw: dict | None = None,
     ):
         prompt_id = None
         prompt_version = None
         information_id = None
         information_version = None
-        using_prompt_file = not bool(template)
-        using_informaton_file = not bool(information)
         env = Environment(loader=FileSystemLoader(template_folder), autoescape=False)
-        if template:
-            self.template = env.from_string(template)
+        if prompt_raw:
+            self.template = env.from_string(prompt_raw)
             if winner_prefix == None:
-                raise Exception("No winner prefix provided!")
+                raise ValueError("No winner prefix provided!")
             self.winner_prefix = winner_prefix
             self.stop = stop
         else:
-            with open(join(template_folder, prompt), "r") as file:
+            if not prompt_file:
+                raise ValueError("No prompt file or raw prompt provided.")
+            with open(join(template_folder, prompt_file), "r") as file:
                 prompt_meta = toml.load(file)
                 self.template = env.get_template(prompt_meta["template_file"])
                 prompt_id = prompt_meta["id"]
                 prompt_version = prompt_meta["version"]
                 self.winner_prefix = prompt_meta["winner_prefix"]
                 self.stop = prompt_meta["stop"]
-        if not information:
+        if not information_raw:
             with open(information_file, "r") as file:
-                information = toml.load(file)
-        information_id = information["id"]  # type: ignore
-        information_version = information["version"]  # type: ignore
-        self.information = information
-        self.object = {
-            "prompt": {"id": prompt_id, "version": prompt_version, "file": prompt},
-            "information": {
-                "id": information_id,
-                "version": information_version,
-                "file": information_file,
-            },
-        }
+                information_raw = toml.load(file)
+            information_id = information_raw["id"]  # type: ignore
+            information_version = information_raw["version"]  # type: ignore
+        self.information = information_raw
+        self.prompt_id = prompt_id
+        self.prompt_version = prompt_version
+        self.prompt_file = prompt_file
+        self.information_id = information_id
+        self.information_version = information_version
+        self.information_file = information_file
 
     def to_object(self):
-        return self.object
+        return {
+            "prompt": {
+                "id": self.prompt_id,
+                "version": self.prompt_version,
+                "file": self.prompt_file,
+            },
+            "information": {
+                "id": self.information_id,
+                "version": self.information_version,
+                "file": self.information_file,
+            },
+        }
 
     @staticmethod
     def from_object(object: dict[str, Any]) -> Evaluator:
@@ -90,7 +100,7 @@ class Evaluator:
                 "Custom prompt manually provided to previous run (i.e. not in a file), so it cannot be deserialized."
             )
         return Evaluator(
-            prompt=object["prompt"]["file"],
+            prompt_file=object["prompt"]["file"],
             information_file=object["information"]["file"],
         )
 
@@ -176,7 +186,7 @@ class Evaluator:
                         model=model, messages=messages, **completion_args
                     )  # type: ignore
                 raise Exception("Impossible?")
-            except (APIConnectionError, RateLimitError) as e:
+            except (APIConnectionError, RateLimitError, BadRequestError) as e:
                 logger.warn("Completion attempt failed: %s", str(e))
                 logger.warn("Retrying...")
                 attempts += 1
@@ -200,7 +210,13 @@ class Evaluator:
         debug_folder: str = DEBUG_FOLDER,
         verbose: bool = False,
     ) -> tuple[tuple[Character, Character] | None, float, MatchSettings]:
-        match_settings = MatchSettings(model)
+        match_settings = MatchSettings(
+            model,
+            self.prompt_id,
+            self.prompt_version,
+            self.information_id,
+            self.information_version,
+        )
         prompt_text = self.format(
             character_a,
             character_b,

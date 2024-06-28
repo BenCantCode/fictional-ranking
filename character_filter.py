@@ -196,7 +196,9 @@ class CharacterIdFilter(CharacterFilter):
     def from_parameters(
         parameters: dict[str, Any], registrar: CharacterFilterTypeRegistrar
     ) -> CharacterIdFilter:
-        return CharacterIdFilter(parameters["characters"])
+        return CharacterIdFilter(
+            [CharacterId.from_str(id) for id in parameters["characters"]]
+        )
 
 
 class CharacterNameFilter(CharacterFilter):
@@ -327,4 +329,7 @@ class CharacterFilterTypeRegistrar(TypeRegistrar[CharacterFilter]):
         SourceFilter,
         CharacterNameFilter,
         EverythingFilter,
+        CharacterIdFilter,
+        RatingFilter,
+        LengthFilter,
     ]

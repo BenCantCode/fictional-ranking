@@ -103,15 +103,54 @@ class PreparedMatch:
 
 
 class MatchSettings:
-    def __init__(self, model: str | None = None):
+    def __init__(
+        self,
+        model: str | None,
+        prompt_id: str | None,
+        prompt_version: str | None,
+        information_id: str | None,
+        information_version: str | None,
+    ):
         self.model = model
+        self.prompt_id = prompt_id
+        self.prompt_version = prompt_version
+        self.information_id = information_id
+        self.information_version = information_version
 
     def to_object(self):
-        return {"model": self.model}
+        return {
+            "model": self.model,
+            "prompt": {
+                "id": self.prompt_id,
+                "version": self.prompt_version,
+            },
+            "information": {
+                "id": self.information_id,
+                "version": self.information_version,
+            },
+        }
 
     @staticmethod
     def from_object(object: dict[str, Any]):
-        return MatchSettings(model=object["model"])
+        prompt_id = None
+        prompt_version = None
+        information_id = None
+        information_version = None
+        prompt_object = object.get("prompt")
+        if prompt_object:
+            prompt_id = prompt_object.get("id")
+            prompt_version = prompt_object.get("version")
+        information_object = object.get("information")
+        if information_object:
+            information_id = information_object.get("id")
+            information_version = information_object.get("version")
+        return MatchSettings(
+            object.get("model"),
+            prompt_id,
+            prompt_version,
+            information_id,
+            information_version,
+        )
 
 
 class MatchResult:
@@ -123,7 +162,7 @@ class MatchResult:
         character_b: MatchCharacterMeta,
         outcome: Outcome | None,
         cost: float | None,
-        match_settings: MatchSettings | None = None,
+        match_settings: MatchSettings | None,
     ):
         self.match_id = match_id
         self.run_id = run_id

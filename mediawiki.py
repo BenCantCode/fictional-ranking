@@ -174,7 +174,7 @@ class MediaWiki(Source):
         for action, elem in iterparse(extracted):
             if action == "end":
                 if elem.tag == f"{{{NAMESPACE}}}page":
-                    if elem.findtext(f"{{{NAMESPACE}}}ns") in ["0", "10", "14"]:
+                    if elem.findtext(f"{{{NAMESPACE}}}ns") in ["0", "6", "10", "14"]:
                         article = WikiArticle(elem)
                         self.articles[article.title] = article
         print("Parsed! Caching...")

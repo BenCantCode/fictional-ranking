@@ -1,8 +1,9 @@
-from choix import ilsr_pairwise, opt_pairwise
+from choix import ilsr_pairwise_dense, opt_pairwise
+from config import MODEL_SCALING, DEFAULT_RATING, ALPHA, SCALE_FACTOR
 from match import MatchResult, Outcome
 from character import CharacterId
-
-DEFAULT_RATING = 0
+import numpy as np
+import numpy.typing
 
 
 def _map_characters(
@@ -18,27 +19,49 @@ def _map_characters(
     return (n, id_to_int, int_to_id)
 
 
-def _results_to_tuples(
-    results: list[MatchResult], id_to_int: dict[CharacterId, int]
-) -> list[tuple[int, int]]:
-    result_tuples = []
+def _results_to_matrix(
+    n: int,
+    results: list[MatchResult],
+    id_to_int: dict[CharacterId, int],
+    model_scaling: dict[str, float],
+) -> numpy.typing.NDArray[np.float64]:
+    matrix = np.zeros((n, n))
     for result in results:
         if result.outcome == Outcome.A_WINS:
-            result_tuples.append(
-                (id_to_int[result.character_a.id], id_to_int[result.character_b.id])
+            matrix[id_to_int[result.character_a.id]][
+                id_to_int[result.character_b.id]
+            ] += model_scaling.get(
+                (
+                    result.match_settings.model or "default"
+                    if result.match_settings
+                    else "default"
+                ),
+                model_scaling["default"],
             )
-        elif result.outcome == Outcome.B_WINS:
-            result_tuples.append(
-                (id_to_int[result.character_b.id], id_to_int[result.character_a.id])
+        elif result.outcome == Outcome.B_WINS:  # type: ignore
+            matrix[id_to_int[result.character_b.id]][
+                id_to_int[result.character_a.id]
+            ] += model_scaling.get(
+                (
+                    result.match_settings.model or "default"
+                    if result.match_settings
+                    else "default"
+                ),
+                model_scaling["default"],
             )
-    return result_tuples
+    return matrix
 
 
-def rate_characters(results: list[MatchResult]) -> dict[CharacterId, float]:
+def rate_characters(
+    results: list[MatchResult], model_scaling: dict[str, float] = MODEL_SCALING
+) -> dict[CharacterId, float]:
     if len(results) == 0:
         return {}
     n, id_to_int, int_to_id = _map_characters(results)
-    result_tuples = _results_to_tuples(results, id_to_int)
-    raw_rankings = ilsr_pairwise(n, result_tuples, alpha=0.0001)
-    rankings = dict((int_to_id[i], raw_rankings[i]) for i in range(n))
+    matrix = _results_to_matrix(n, results, id_to_int, model_scaling)
+    raw_rankings = ilsr_pairwise_dense(matrix, alpha=ALPHA)
+    rankings = dict(
+        (int_to_id[i], raw_rankings[i] * SCALE_FACTOR + DEFAULT_RATING)
+        for i in range(n)
+    )
     return rankings

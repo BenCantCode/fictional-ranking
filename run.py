@@ -4,6 +4,7 @@ from aiolimiter import AsyncLimiter
 
 
 from character import CharacterId
+from character_filter import CharacterFilterTypeRegistrar
 from evaluate import Evaluator
 from generator import Generator
 from typing import TYPE_CHECKING, Any
@@ -16,6 +17,9 @@ from config import (
 from tqdm.asyncio import tqdm
 from math import ceil
 import logging
+
+from match_filter import MatchFilterTypeRegistrar
+from matchmaking import MatchmakerTypeRegistrar
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +43,20 @@ class RunParameters:
         }
 
     @staticmethod
-    def from_object(object: dict[str, Any]):
+    def from_object(
+        object: dict[str, Any],
+        character_filter_type_registrar: CharacterFilterTypeRegistrar,
+        matchmaker_type_registrar: MatchmakerTypeRegistrar,
+        match_filter_type_registrar: MatchFilterTypeRegistrar,
+    ):
         if object["generator"]:
             try:
-                generator = Generator.from_object(object["generator"])
+                generator = Generator.from_object(
+                    object["generator"],
+                    character_filter_type_registrar,
+                    matchmaker_type_registrar,
+                    match_filter_type_registrar,
+                )
             except NotImplementedError as e:
                 logger.warn("Cannot reserialize generator: %s", str(e))
                 generator = None

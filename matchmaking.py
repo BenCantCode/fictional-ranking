@@ -8,7 +8,7 @@ from match import PreparedMatch
 from match_filter import MatchFilter
 from type_registrar import Type, TypeRegistrar
 import json
-from rating import DEFAULT_RATING
+from config import DEFAULT_RATING
 
 
 class Matchmaker(Type):

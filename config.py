@@ -1,10 +1,6 @@
 import litellm
 from os.path import join, dirname
 from dotenv import load_dotenv
-from character import CharacterId
-from character_filter import CharacterFilterTypeRegistrar
-from match_filter import MatchFilterTypeRegistrar
-from matchmaking import MatchmakerTypeRegistrar
 
 VERSION = "0.0.1"
 
@@ -45,26 +41,39 @@ TOKEN_LIMITED = True  # If true, rate limits based on tokens. If false, rate lim
 TOKENS_PER_INTERVAL = 200000
 REQUESTS_PER_INTERVAL = 1000
 INTERVAL_SECS = 60
-MAX_OUTPUT_TOKENS_ESTIMATE = 4096  # Used when a model isn't known to LiteLLM.
+MAX_OUTPUT_TOKENS_ESTIMATE = 0  # Used when a model isn't known to LiteLLM.
 EXECUTE_DELAY = 0.5  # To control "bursts"
 
 NUM_RETRIES = 10
 
 
-# Prompt (Jinja2 in toml)
+# Prompt
 PROMPT = "prompt_end.toml"
 
 # Model (see LiteLLM docs)
+MODEL = "command-r-plus"
 # MODEL = "claude-3-haiku-20240307"
-MODEL = "claude-3-5-sonnet-20240620"
+# MODEL = "claude-3-5-sonnet-20240620"
+
+# For rating generation
+DEFAULT_RATING = 1500
+SCALE_FACTOR = 400
+ALPHA = 0.00001  # Regularization parameter.
+
+# How much to weigh the result of each model.
+MODEL_SCALING = {
+    "gemini/gemini-1.5-flash": 0.2,
+    "claude-3-haiku-20240307": 1,
+    "claude-3-5-sonnet-20240620": 1.75,
+    "gemini/gemini-1.5-pro": 0.4,
+    "command-r": 1.25,
+    "command-r-plus": 1.5,
+    "default": 1,
+}
 
 # The arguments used in text generation
 COMPLETION_ARGS = {
     # The temperature. A lower temperature value generally results in less creative responses.
     "temperature": 0,
-    "timeout": 120,
+    "timeout": 40,
 }
-
-CHARACTER_FILTER_TYPE_REGISTRAR = CharacterFilterTypeRegistrar()
-MATCH_FILTER_TYPE_REGISTRAR = MatchFilterTypeRegistrar()
-MATCHMAKER_TYPE_REGISTRAR = MatchmakerTypeRegistrar()

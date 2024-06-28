@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+from aiolimiter import AsyncLimiter
 from character import CharacterId
 from config import *
 from os.path import join
@@ -15,6 +16,8 @@ logging.getLogger("LiteLLM").setLevel(logging.WARNING)
 
 manager = SourceManager()
 evaluator = Evaluator()
+
+rate_limit = AsyncLimiter(1, 4)
 
 for eval_name in sys.argv[1:]:
     print(eval_name)
@@ -40,8 +43,8 @@ for eval_name in sys.argv[1:]:
                 CharacterId.from_str(match["winner"])
             )
             expected_loser = manager.get_character(CharacterId.from_str(match["loser"]))
-            w_l, cost = asyncio.run(
-                evaluator.evaluate(expected_winner, expected_loser, False)
+            w_l, cost, match_settings = asyncio.run(
+                evaluator.evaluate(expected_winner, expected_loser, False, rate_limit)
             )
             if not w_l:
                 print("No result")
@@ -53,8 +56,8 @@ for eval_name in sys.argv[1:]:
                 print("A Incorrect")
                 incorrect += 1
                 incorrect_a += 1
-            w_l, cost = asyncio.run(
-                evaluator.evaluate(expected_loser, expected_winner, False)
+            w_l, cost, match_settings = asyncio.run(
+                evaluator.evaluate(expected_loser, expected_winner, False, rate_limit)
             )
             if not w_l:
                 print("No result")
