@@ -3,9 +3,8 @@ from datetime import datetime
 from typing import Iterable, Callable, TypeAlias, Union
 from lxml.etree import iterparse, ElementBase
 from source import Source
-from urllib.request import urlretrieve, urlopen
+from urllib.request import urlretrieve
 from urllib.parse import quote_plus
-import tempfile
 import os
 from os.path import join, exists
 import pickle
@@ -13,7 +12,6 @@ from character import CharacterId, Section, Character
 import wikitextparser as wtp
 from wikitextparser import Template, WikiText, WikiLink
 from wikitextparser._spans import parse_to_spans
-import lzma
 import re
 import zstandard
 import requests
@@ -21,7 +19,6 @@ from py7zr import SevenZipFile
 from config import *
 from functools import wraps
 from exceptions import NotACharacterException
-import time
 from dateutil.parser import parse as parsedate
 
 NAMESPACE = "http://www.mediawiki.org/xml/export-0.11/"
@@ -126,9 +123,10 @@ class MediaWiki(Source):
     SECTION_PRIORITY: dict[str, float] = {}
     DEFAULT_SECTION_PRIORITY = 2
 
-    def __init__(self, download_path: str = DOWNLOADS_FOLDER):
+    def __init__(self, download_path: str = DOWNLOADS_FOLDER, downloaded: bool = False):
         self.cache_path = join(download_path, self.SOURCE_ID, "wiki.pickle.zst")
         self.dump_path = join(download_path, self.SOURCE_ID, "wiki.xml")
+        self.image_path = join(download_path, self.SOURCE_ID, "images")
         # Register template renderers
         self.wikitext_transformers = []
         for name in dir(self):
@@ -148,27 +146,25 @@ class MediaWiki(Source):
                 with dctx.stream_reader(cache) as reader:
                     self.articles = pickle.load(reader)
 
-    def download(self):
+    async def download(self):
         os.makedirs(self.path, exist_ok=True)
         print("Downloading", self.DUMP_URL)
         tmp_download_path = None
         self.version = str(datetime.now())
+        with open(self.dump_path, "wb") as local_dump:
+            async with ASYNC_CLIENT.stream("GET", self.DUMP_URL) as remote_dump:
+                async for chunk in remote_dump.aiter_bytes():
+                    local_dump.write(chunk)
+                if "last-modified" in remote_dump.headers:
+                    self.version = str(parsedate(remote_dump.headers["last-modified"]))
+        print("Downloaded!")
         if self.DUMP_FORMAT == "xml":
-            print("(streaming)")
-            res = requests.get(self.DUMP_URL, stream=True)
-            extracted = res.raw
-            if "last-modified" in res.headers:
-                self.version = str(parsedate(res.headers["last-modified"]))
+            extracted = open(self.dump_path, "rb")
+        if self.DUMP_FORMAT == "7z":
+            with SevenZipFile(self.dump_path) as compressed:
+                extracted = next(iter(compressed.readall().values()))  # type: ignore
         else:
-            tmp_download_path, http_message = urlretrieve(self.DUMP_URL)
-            if "last-modified" in http_message:
-                self.version = str(parsedate(http_message["last-modified"]))
-            print("Downloaded!")
-            if self.DUMP_FORMAT == "7z":
-                with SevenZipFile(tmp_download_path) as compressed:
-                    extracted = next(iter(compressed.readall().values()))  # type: ignore
-            else:
-                raise NotImplementedError(self.DUMP_FORMAT)
+            raise NotImplementedError(self.DUMP_FORMAT)
         self.articles = {}
         elem: ElementBase
         print("Parsing...")
@@ -178,6 +174,7 @@ class MediaWiki(Source):
                     if elem.findtext(f"{{{NAMESPACE}}}ns") in ["0", "6", "10", "14"]:
                         article = WikiArticle(elem)
                         self.articles[article.title] = article
+        extracted.close()
         print("Parsed! Caching...")
         with open(self.cache_path, "wb") as cache:
             cctx = zstandard.ZstdCompressor()
@@ -186,8 +183,10 @@ class MediaWiki(Source):
         print("Cached!")
         if tmp_download_path:
             print("Deleting original...")
-            # os.remove(tmp_download_path)
+            if not KEEP_ORIGINAL_DOWNLOADS:
+                os.remove(tmp_download_path)
             print("Deleted!")
+        os.makedirs(self.image_path)
 
     def all_articles(self) -> Iterable[WikiArticle]:
         return iter(self.articles.values())
@@ -262,6 +261,7 @@ class MediaWiki(Source):
             CharacterId(self.SOURCE_ID, article.title),
             str(article.revision),
             self.extract_sections(article),
+            self,
         )
 
     def get_character(self, character_name: str) -> Character:

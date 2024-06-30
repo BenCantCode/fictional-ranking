@@ -1,4 +1,6 @@
+from __future__ import annotations
 from typing import Iterable
+from urllib.request import urlretrieve
 from mediawiki import (
     MediaWiki,
     WikiArticle,
@@ -6,9 +8,10 @@ from mediawiki import (
     wikitext_transformer,
     DeepPagesList,
 )
-from character import Character
+from character import Character, CharacterId, Section
 import wikitextparser as wtp
 from wikitextparser import Template, WikiText
+from os.path import exists, join
 
 DEFAULT_TAB_SUBPAGES = set(
     [
@@ -72,6 +75,16 @@ class OnePieceWiki(MediaWiki):
         "external links": 0,
         "references": 0,
     }
+
+    IMAGE_BASE_URL = "https://archive.org/download/wiki-onepiece.fandom.com-20231227/onepiece.fandom.com-20231227-images.7z/images/"
+
+    IMAGE_LOCATIONS = [
+        "{character.name} Anime Post Timeskip Infobox.png",
+        "{character.name} Manga Post Timeskip Infobox.png",
+        "{character.name} Anime Infobox.png",
+        "{character.name} Manga Infobox.png",
+        "{character.name} Infobox.png",
+    ]
 
     # Extract relevant pages from a tab template
     # Only used on the Wiki page for Monkey D. Luffy
@@ -184,3 +197,17 @@ class OnePieceWiki(MediaWiki):
     def all_characters(self) -> Iterable[Character]:
         for character_name in self.all_character_names():
             yield self.get_character(character_name)
+
+    def get_image(self, character: Character) -> str | None:
+        for location in self.IMAGE_LOCATIONS:
+            location = location.format(character=character)
+            local_path = join(self.image_path, location)
+            if exists(local_path):
+                return join(self.image_path, location)
+            elif ("File:" + location) in self.articles:
+                urlretrieve(
+                    self.IMAGE_BASE_URL + location.replace(" ", "_"),
+                    local_path,
+                )
+                return local_path
+        return None

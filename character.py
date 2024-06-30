@@ -1,6 +1,10 @@
 from __future__ import annotations
+from aiolimiter import AsyncLimiter
 from litellm import token_counter, completion_cost
-from typing import Iterable
+from typing import Iterable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from source import Source
 
 
 class CharacterId:
@@ -45,10 +49,17 @@ class Section:
 
 
 class Character:
-    def __init__(self, id: CharacterId, revision: str, sections: list[Section]):
+    def __init__(
+        self,
+        id: CharacterId,
+        revision: str,
+        sections: list[Section],
+        source: Source | None,
+    ):
         self.id = id
         self.sections = sections
         self.revision = revision
+        self.source = source
 
     @property
     def full_text(self):
@@ -79,6 +90,12 @@ class Character:
             )
             text = Section.combine_sections(abridged_sections)
         return text
+
+    async def get_image(self, rate_limit: AsyncLimiter) -> str | None:
+        if self.source:
+            return self.source.get_image(self)
+        else:
+            raise NotImplementedError("Getting images without a loaded source.")
 
     @property
     def name(self) -> str:

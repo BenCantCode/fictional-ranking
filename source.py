@@ -17,26 +17,31 @@ class Source(ABC):
         def SOURCE_ID():
             pass
 
-    def __init__(self, downloads_folder: str = DOWNLOADS_FOLDER):
+    def __init__(
+        self,
+        downloads_folder: str = DOWNLOADS_FOLDER,
+    ):
         self.path = join(downloads_folder, self.SOURCE_ID)
         self.parsed = False
-        self.load()
 
     @abstractmethod
-    def download(self):
+    async def download(self):
         pass
 
     def parse(self):
         self.parsed = True
 
-    def load(self):
+    async def load(self):
         if not exists(self.path):
-            self.download()
+            await self.download()
         self.parse()
 
     @abstractmethod
     def get_character(self, character_name: str) -> Character:
         pass
+
+    def get_image(self, character: Character) -> str | None:
+        return None
 
     @abstractmethod
     def all_characters(self) -> Iterable[Character]:

@@ -17,9 +17,14 @@ class SourceManager:
         self.download_path = download_path
         self.sources: dict[str, Source] = {}
 
-    def load_source(self, source_id: str):
+    async def load_source(self, source_id: str):
         if source_id not in self.sources:
+            source = AVAILABLE_SOURCES[source_id](self.download_path)
             self.sources[source_id] = AVAILABLE_SOURCES[source_id](self.download_path)
+            await source.load()
+            return source
+        else:
+            return self.sources[source_id]
 
     @functools.lru_cache(maxsize=8192)
     def get_character(self, character_id: CharacterId):

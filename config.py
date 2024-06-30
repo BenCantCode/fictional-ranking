@@ -1,6 +1,7 @@
 import litellm
 from os.path import join, dirname
 from dotenv import load_dotenv
+import httpx
 
 VERSION = "0.0.1"
 
@@ -27,6 +28,9 @@ INFORMATION_FILE = join(PROJECT_ROOT, "information.toml")
 
 # Database file (used for in-progress runs)
 DB_PATH = join(PROJECT_ROOT, "runs.sqlite")
+
+# Whether to keep the original downloads (used for Mediawiki wikis)
+KEEP_ORIGINAL_DOWNLOADS = False
 
 # Per-character limits
 MAX_CHARACTERS = 100000
@@ -77,3 +81,8 @@ COMPLETION_ARGS = {
     "temperature": 0,
     "timeout": 40,
 }
+
+# Used by urllib
+USER_AGENT = "FictionalCharacterRanker (BenCantCode on GitHub)"
+CLIENT = httpx.Client(headers={"User-Agent": USER_AGENT})
+ASYNC_CLIENT = httpx.AsyncClient(headers={"User-Agent": USER_AGENT})
