@@ -105,12 +105,15 @@ class MarvelWiki(MediaWiki):
 
     @wikitext_transformer
     def expand_character_template(self, title: str, wikitext: WikiText):
-        template = wikitext.templates[0]
-        if not template or not template.normal_name().strip().endswith(
-            "Character Template"
-        ):
+        template = next(
+            template
+            for template in wikitext.templates
+            if template.normal_name().strip().endswith("Character Template")
+        )
+        if not template:
             logger.info(
-                "%s does not use a character template; are they really a character?"
+                "%s does not use a character template; are they really a character?",
+                title,
             )
             return
 

@@ -140,6 +140,16 @@ class Evaluator:
             }
         )
 
+    # https://stackoverflow.com/a/22096493
+    @staticmethod
+    def _name_parts(name: str) -> set[str]:
+        return set(
+            ("".join([c if c.isalnum() else " " for c in name.lower()])).split(" ")
+        )
+
+    def _full_name(self, name: str, source_id: str):
+        return f"{name} ({self.information[source_id]['name']})"
+
     def parse_result(
         self, response: str, character_a: Character, character_b: Character
     ) -> Character:
@@ -152,8 +162,8 @@ class Evaluator:
             expected_a = character_a.name
             expected_b = character_b.name
         else:
-            expected_a = f"{character_a.name} ({self.information[character_a.source_id]['name']})"
-            expected_b = f"{character_b.name} ({self.information[character_b.source_id]['name']})"
+            expected_a = self._full_name(character_a.name, character_a.source_id)
+            expected_b = self._full_name(character_b.name, character_b.source_id)
         # If the names match exactly, use them
         if winner_raw == expected_a:
             return character_a
@@ -161,8 +171,25 @@ class Evaluator:
             return character_b
         logger.warn("Complex result: %s", winner_raw)
         # If they don't match, return whichever has more overlap
-        overlap_a = len(set(expected_a.split(" ")) & set(winner_raw.split(" ")))
-        overlap_b = len(set(expected_b.split(" ")) & set(winner_raw.split(" ")))
+        overlap_a = 0
+        overlap_b = 0
+        winner_raw_parts = self._name_parts(winner_raw)
+        for alias in [character_a.name] + character_a.aliases:
+            overlap_a = max(
+                overlap_a,
+                len(
+                    set(self._name_parts(self._full_name(alias, character_a.source_id)))
+                    & winner_raw_parts
+                ),
+            )
+        for alias in [character_b.name] + character_b.aliases:
+            overlap_b = max(
+                overlap_b,
+                len(
+                    set(self._name_parts(self._full_name(alias, character_b.source_id)))
+                    & winner_raw_parts
+                ),
+            )
         if overlap_a > overlap_b:
             return character_a
         if overlap_b > overlap_a:

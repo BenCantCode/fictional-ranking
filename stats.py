@@ -73,12 +73,12 @@ async def main():
         character_filter, match_filter, matchmaker, source_manager.source_versions
     )
 
-    # run = db.get_run_by_name(
-    #     "marvel_random_1",
-    #     source_manager,
-    # )
+    run = db.get_run_by_name(
+        "marvel_powermatched_3",
+        source_manager,
+    )
 
-    run = Run("marvel_powermatched_1", generator, evaluator, db, False)
+    # run = Run("marvel_powermatched_2", generator, evaluator, db, False)
 
     results, cost = await run.start(source_manager, AsyncLimiter(1, 3), verbose=True)
     with open("results.txt", "w") as file:
