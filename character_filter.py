@@ -205,7 +205,7 @@ class CharacterNameFilter(CharacterFilter):
     def __init__(self, pattern: re.Pattern):
         self.pattern = pattern
 
-    def ok(self, character_id: CharacterId):
+    def ok(self, character_id: CharacterId, source_manager: SourceManager):
         return self.pattern.fullmatch(character_id.name)
 
     @property
@@ -236,7 +236,9 @@ class SourceFilter(CharacterFilter):
         return {"sources": self.source_ids}
 
     @staticmethod
-    def from_parameters(parameters: dict[str, Any]) -> SourceFilter:
+    def from_parameters(
+        parameters: dict[str, Any], registrar: TypeRegistrar[CharacterFilter]
+    ) -> SourceFilter:
         return SourceFilter(parameters["sources"])
 
 
@@ -290,14 +292,13 @@ class RatingFilter(CharacterFilter):
 class LengthFilter(CharacterFilter):
     """Matches characters based on their abridged article length."""
 
-    def __init__(self, threshold: float, ratings: dict[CharacterId, float]):
+    def __init__(self, threshold: float):
         self.threshold = threshold
 
     def ok(self, character_id: CharacterId, source_manager: SourceManager):
         # Hopefully this is cached.
         return (
-            len(source_manager.get_character(character_id).abridged_text())
-            > self.threshold
+            source_manager.get_character_length_estimate(character_id) >= self.threshold
         )
 
     @property

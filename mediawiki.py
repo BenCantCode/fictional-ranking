@@ -1,6 +1,6 @@
 from __future__ import annotations
 from datetime import datetime
-from typing import Iterable, Callable, TypeAlias, Union
+from typing import Iterable, Callable, TypeAlias, Union, IO
 from lxml.etree import iterparse, ElementBase
 from source import Source
 from urllib.request import urlretrieve
@@ -28,12 +28,14 @@ class WikiArticle:
     title: str
     revision: datetime
     content: str
+    namespace: int
 
     def __init__(self, el: ElementBase, namespace=NAMESPACE):
         ns = {"mw": namespace}
         self.title = el.findtext(f"mw:title", namespaces=ns)  # type: ignore
         text = el.findtext(f"mw:revision/mw:text", namespaces=ns)
         self.revision = parsedate(el.findtext(f"mw:revision/mw:timestamp", namespaces=ns))  # type: ignore
+        self.namespace = int(el.findtext(f"mw:ns", namespaces=ns))  # type: ignore
         if text:
             self.content = text
         else:
@@ -123,9 +125,9 @@ class MediaWiki(Source):
     SECTION_PRIORITY: dict[str, float] = {}
     DEFAULT_SECTION_PRIORITY = 2
 
-    def __init__(self, download_path: str = DOWNLOADS_FOLDER, downloaded: bool = False):
+    def __init__(self, download_path: str = DOWNLOADS_FOLDER):
         self.cache_path = join(download_path, self.SOURCE_ID, "wiki.pickle.zst")
-        self.dump_path = join(download_path, self.SOURCE_ID, "wiki.xml")
+        self.dump_path = join(download_path, self.SOURCE_ID, "wiki.xml.7z")
         self.image_path = join(download_path, self.SOURCE_ID, "images")
         # Register template renderers
         self.wikitext_transformers = []
@@ -136,6 +138,28 @@ class MediaWiki(Source):
         self.wikitext_transformers.sort(key=lambda method: method._wikitext_transformer)
         super().__init__(download_path)
 
+    @property
+    def downloaded(self):
+        return exists(self.cache_path)
+
+    def parse_from_stream(self, stream: IO):
+        self.articles = {}
+        for action, elem in iterparse(stream):
+            if action == "end":
+                if elem.tag == f"{{{NAMESPACE}}}page":
+                    if elem.findtext(f"{{{NAMESPACE}}}ns") in ["0", "6", "10", "14"]:
+                        article = WikiArticle(elem)
+                        self.articles[article.title] = article
+        self.parsed = True
+
+    def cache(self):
+        print("Caching...")
+        with open(self.cache_path, "wb") as cache:
+            cctx = zstandard.ZstdCompressor()
+            with cctx.stream_writer(cache) as writer:
+                pickle.dump(self.articles, writer)
+        print("Cached!")
+
     def parse(self):
         if self.parsed:
             # Already parsed.
@@ -144,49 +168,48 @@ class MediaWiki(Source):
             with open(self.cache_path, "rb") as cache:
                 dctx = zstandard.ZstdDecompressor()
                 with dctx.stream_reader(cache) as reader:
-                    self.articles = pickle.load(reader)
+                    self.articles: dict[str, WikiArticle] = pickle.load(reader)
+        elif exists(self.dump_path):
+            if self.DUMP_FORMAT == "xml":
+                with open(self.dump_path, "rb") as dump:
+                    return self.parse_from_stream(dump)
+            elif self.DUMP_FORMAT == "7z":
+                with SevenZipFile(self.dump_path) as compressed_dump:
+                    with next(iter(compressed_dump.readall().values())) as extracted:  # type: ignore
+                        return self.parse_from_stream(extracted)
+            else:
+                raise NotImplementedError(self.DUMP_FORMAT)
+            self.cache()
+        else:
+            raise Exception("Not downloaded!")
 
     async def download(self):
         os.makedirs(self.path, exist_ok=True)
         print("Downloading", self.DUMP_URL)
         tmp_download_path = None
         self.version = str(datetime.now())
-        with open(self.dump_path, "wb") as local_dump:
-            async with ASYNC_CLIENT.stream("GET", self.DUMP_URL) as remote_dump:
-                async for chunk in remote_dump.aiter_bytes():
-                    local_dump.write(chunk)
-                if "last-modified" in remote_dump.headers:
-                    self.version = str(parsedate(remote_dump.headers["last-modified"]))
-        print("Downloaded!")
-        if self.DUMP_FORMAT == "xml":
-            extracted = open(self.dump_path, "rb")
-        if self.DUMP_FORMAT == "7z":
-            with SevenZipFile(self.dump_path) as compressed:
-                extracted = next(iter(compressed.readall().values()))  # type: ignore
+        if not exists(self.dump_path):
+            with open(self.dump_path, "wb") as local_dump:
+                async with ASYNC_CLIENT.stream("GET", self.DUMP_URL) as remote_dump:
+                    async for chunk in remote_dump.aiter_bytes():
+                        local_dump.write(chunk)
+                    if "last-modified" in remote_dump.headers:
+                        self.version = str(
+                            parsedate(remote_dump.headers["last-modified"])
+                        )
+            print("Downloaded!")
         else:
-            raise NotImplementedError(self.DUMP_FORMAT)
-        self.articles = {}
-        elem: ElementBase
+            print("Already downloaded!")
         print("Parsing...")
-        for action, elem in iterparse(extracted):
-            if action == "end":
-                if elem.tag == f"{{{NAMESPACE}}}page":
-                    if elem.findtext(f"{{{NAMESPACE}}}ns") in ["0", "6", "10", "14"]:
-                        article = WikiArticle(elem)
-                        self.articles[article.title] = article
-        extracted.close()
-        print("Parsed! Caching...")
-        with open(self.cache_path, "wb") as cache:
-            cctx = zstandard.ZstdCompressor()
-            with cctx.stream_writer(cache) as writer:
-                pickle.dump(self.articles, writer)
-        print("Cached!")
+        self.parse()
+        print("Parsed!")
+        self.cache()
         if tmp_download_path:
-            print("Deleting original...")
             if not KEEP_ORIGINAL_DOWNLOADS:
+                print("Deleting original...")
                 os.remove(tmp_download_path)
-            print("Deleted!")
-        os.makedirs(self.image_path)
+                print("Deleted!")
+        os.makedirs(self.image_path, exist_ok=True)
 
     def all_articles(self) -> Iterable[WikiArticle]:
         return iter(self.articles.values())
@@ -222,9 +245,7 @@ class MediaWiki(Source):
         for transformer in self.wikitext_transformers:
             transformer(title, wikitext)
             # Hack to fix wikitext after transforming
-            wikitext._type_to_spans = parse_to_spans(
-                bytearray(wikitext.string, "ascii", "replace")
-            )
+            wikitext.__init__(wikitext.string)
 
     def extract_sections(self, article: WikiArticle):
         parsed = wtp.parse(article.content)
@@ -238,44 +259,59 @@ class MediaWiki(Source):
             i += 1
             found = False
             if section.title != None:
-                section.title = section.title.strip()
-                if section.title.lower() in self.SECTION_PRIORITY:  # type: ignore
+                title = section.title.strip()
+                if title.lower() in self.SECTION_PRIORITY:  # type: ignore
                     found = True
                     found_level = section.level
-                    found_priority = self.SECTION_PRIORITY[section.title.lower()]  # type: ignore
+                    found_priority = self.SECTION_PRIORITY[title.lower()]  # type: ignore
             if not found and found_level != None and section.level <= found_level:
                 found_level = None
                 found_priority = self.DEFAULT_SECTION_PRIORITY
-            sections.append(
-                Section(
-                    re.sub("[\n]+", "\n", section.plain_text()),
-                    found_priority,
+            try:
+                sections.append(
+                    Section(
+                        re.sub("[\n]+", "\n", section.plain_text()),
+                        found_priority,
+                    )
                 )
-            )
+            except Exception as e:
+                print(article.title)
+                raise e
         sections[0].text = "==Introduction==\n" + sections[0].text
         sections[0].priority = self.SECTION_PRIORITY["introduction"]
         return sections
 
+    def _get_aliases(self, article: WikiArticle):
+        return []
+
     def character_from_article(self, article: WikiArticle) -> Character:
+        aliases = self._get_aliases(article)
         return Character(
             CharacterId(self.SOURCE_ID, article.title),
             str(article.revision),
             self.extract_sections(article),
             self,
+            aliases,
         )
 
     def get_character(self, character_name: str) -> Character:
         article = self.get_article(character_name)
-        if article == None:
+        if article == None or not self.article_filter(article):
             raise NotACharacterException(character_name)
         while article.content.startswith("#REDIRECT"):
             article = self.get_article(wtp.parse(article.content).wikilinks[0].title)
             if article == None:
-                raise ValueError("Redirect goes to blank page!")
+                raise ValueError("Redirect goes to nonexistent page!")
         return self.character_from_article(article)
 
+    def get_character_length_estimate(self, character_name: str) -> int:
+        if character_name in self.articles:
+            return len(self.articles[character_name].content)
+        else:
+            raise NotACharacterException(character_name)
+
     def article_filter(self, article: WikiArticle):
-        return True
+        return article.namespace == 0
 
     def all_characters(self) -> Iterable[Character]:
         for article in self.all_articles():

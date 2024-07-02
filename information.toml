@@ -19,41 +19,18 @@ There is also an introduction to a number of famous blades of high quality used 
 [marvel]
 name = "Marvel"
 type = "mediawiki"
+# Adapted from many Marvel Wiki pages, including https://marvel.fandom.com/wiki/Mutants_(Homo_superior), https://marvel.fandom.com/wiki/Glossary:Mutate, https://marvel.fandom.com/wiki/Inhumans_(Inhomo_supremis), https://marvel.fandom.com/wiki/Glossary:Cosmic_Beings, https://marvel.fandom.com/wiki/Beyonders, and https://marvel.fandom.com/wiki/Celestials. CC-BY-SA.
 explanation = """
+## Mutants
+Mutation is caused by the X-Gene in mutants' DNA. These mutations can give mutants widely varying kinds of superhuman abilities.
 
+## Mutates
+A mutate is a being who acquired a physical characteristic through exposure to one or more mutagenic agents (e.g. magic, radiation, toxic waste, the bite of a genetically-engineered spider, etc.), rather than being born with the potential to naturally develop powers.
+
+## Inhumans
+Inhumans are an offshoot of genetically engineered humans. Inhumans' strength levels can vary regarding their powers, originated from Terrigenesis or hereditary transmission. Centuries of selective breeding have given some Inhumans certain advantages.
+
+## Cosmics Beings
+Cosmic beings or cosmic entities are beings that have some level of omnipotence, cosmic awareness, and/or universal significance. They are usually immortal.
+Examples of cosmic beings include Celestials and Beyonders.
 """
-[[marvel.include]]
-required_tags = ""
-categories = [
-    # "Good" groups
-    "Category:Fantastic Four (Earth-616)/Members",
-    "Category:Avengers (Earth-616)/Members",
-    "Category:New Avengers (Earth-616)/Members",
-    "Category:X-Men (Earth-616)",
-    "Category:Guardians of the Galaxy (Earth-616)/Members",
-    "Category:House of Agon (Earth-616)/Members",
-    "Category:Runaways (Earth-616)/Members",
-    # "Bad" groups
-]
-articles = [
-    "Victor von Doom (Earth-616)",
-    "Max Eisenhardt (Earth-616)",
-    "En Sabah Nur (Earth-616)",
-    "Norman Osborn (Earth-616)",
-    "Otto Octavius (Earth-616)",
-    "Edward Brock (Earth-616)",
-    "Victor Creed (Earth-616)",
-    "Wilson Fisk (Earth-616)",
-    "Bullseye (Lester) (Earth-616)",
-    "Samuel Sterns (Earth-616)",
-    "Thanos (Earth-616)",
-    "Johann Shmidt (Earth-616)",
-    "Loki Laufeyson (Earth-616)",
-    "Galan (Earth-616)",
-    "Ultron (Earth-616)",
-    "Cain Marko (Earth-616)",
-    "William Baker (Earth-616)",
-    "Curtis Connors (Earth-616)",
-    "Emil Blonsky (Earth-616)",
-    "",
-]

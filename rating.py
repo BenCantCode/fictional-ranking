@@ -1,9 +1,12 @@
-from choix import ilsr_pairwise_dense, opt_pairwise
+from choix import ilsr_pairwise_dense
+from character_filter import CharacterFilter
 from config import MODEL_SCALING, DEFAULT_RATING, ALPHA, SCALE_FACTOR
 from match import MatchResult, Outcome
 from character import CharacterId
 import numpy as np
 import numpy.typing
+
+from source_manager import SourceManager
 
 
 def _map_characters(
@@ -53,10 +56,22 @@ def _results_to_matrix(
 
 
 def rate_characters(
-    results: list[MatchResult], model_scaling: dict[str, float] = MODEL_SCALING
+    results: list[MatchResult],
+    source_manager: SourceManager,
+    model_scaling: dict[str, float] = MODEL_SCALING,
+    filter: CharacterFilter | None = None,
 ) -> dict[CharacterId, float]:
     if len(results) == 0:
         return {}
+    if filter:
+        results = [
+            result
+            for result in results
+            if filter.ok(result.character_a.id, source_manager)
+            and filter.ok(result.character_b.id, source_manager)
+        ]
+    else:
+        results = results.copy()
     n, id_to_int, int_to_id = _map_characters(results)
     matrix = _results_to_matrix(n, results, id_to_int, model_scaling)
     raw_rankings = ilsr_pairwise_dense(matrix, alpha=ALPHA)

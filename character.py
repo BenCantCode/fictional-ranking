@@ -1,7 +1,10 @@
 from __future__ import annotations
 from aiolimiter import AsyncLimiter
+from httpx import AsyncClient
 from litellm import token_counter, completion_cost
 from typing import Iterable, TYPE_CHECKING
+
+from config import ASYNC_CLIENT
 
 if TYPE_CHECKING:
     from source import Source
@@ -55,11 +58,13 @@ class Character:
         revision: str,
         sections: list[Section],
         source: Source | None,
+        aliases: list[str] | None = None,
     ):
         self.id = id
         self.sections = sections
         self.revision = revision
         self.source = source
+        self.aliases = aliases or []
 
     @property
     def full_text(self):
@@ -91,9 +96,16 @@ class Character:
             text = Section.combine_sections(abridged_sections)
         return text
 
-    async def get_image(self, rate_limit: AsyncLimiter) -> str | None:
+    async def get_image(
+        self,
+        rate_limit: AsyncLimiter,
+        async_client: AsyncClient = ASYNC_CLIENT,
+        download_if_unavailable: bool = True,
+    ) -> str | None:
         if self.source:
-            return self.source.get_image(self)
+            return await self.source.get_image(
+                self, rate_limit, async_client, download_if_unavailable
+            )
         else:
             raise NotImplementedError("Getting images without a loaded source.")
 

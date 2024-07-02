@@ -21,7 +21,7 @@ For context, you will first be given summaries of the power systems in each char
 </article>{% endif %}
 ---
 
-You will now be provided with the community wiki pages for two fictional characters ({CharacterA} and {CharacterB}) in a random order. You will be asked to imagine a hypothetical one-on-one duel between these two characters, so try to determine each character's most important abilities while reading.
+You will now be provided with the community wiki pages for two fictional characters ({{character_a.name}} and {{character_b.name}}) in a random order. You will be asked to imagine a hypothetical one-on-one duel between these two characters, so try to determine each character's most important abilities while reading.
 
 
 <article>

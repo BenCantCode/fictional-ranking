@@ -6,3 +6,4 @@ debug/*
 *.txt
 *.sqlite
 *.sqlite-journal
+result.html

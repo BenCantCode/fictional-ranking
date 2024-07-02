@@ -10,8 +10,11 @@ from exceptions import ParseException
 import logging
 from typing import Iterable
 from character import Character
+import re
 
 logger = logging.getLogger(__name__)
+
+CHARACTER_PATTERN = re.compile("{{\\s*Marvel Database:\\s*Character Template")
 
 
 class MarvelWiki(MediaWiki):
@@ -38,26 +41,29 @@ class MarvelWiki(MediaWiki):
         "links and references": 0,
     }
 
-    # INCLUDE_CATEGORIES = [
-    #     "Category:Multiverse/Characters",
-    #     "Category:Fantastic Four (Earth-616)/Members",
-    #     "Category:Avengers (Earth-616)/Members",
-    #     "Category:New Avengers (Earth-616)/Members",
-    #     "Category:X-Men (Earth-616)",
-    #     "Category:Guardians of the Galaxy (Earth-616)/Members",
-    #     "Category:House of Agon (Earth-616)/Members",
-    #     "Category:Runaways (Earth-616)/Members",
-    # ]
+    # TODO: Remove this when the wiki updates.
+    @wikitext_transformer
+    def fix_egros(self, title: str, wikitext: WikiText):
 
-    # INCLUDE_CHARACTERS = [
-    #     "Category:Fantastic Four (Earth-616)/Members",
-    #     "Category:Avengers (Earth-616)/Members",
-    #     "Category:New Avengers (Earth-616)/Members",
-    #     "Category:X-Men (Earth-616)",
-    #     "Category:Guardians of the Galaxy (Earth-616)/Members",
-    #     "Category:House of Agon (Earth-616)/Members",
-    #     "Category:Runaways (Earth-616)/Members",
-    # ]
+        if title == "Egros (Earth-616)":
+            wikitext.string = wikitext.string.replace(
+                "{{m[|[Wanderers (Earth-616)|Wanderers]]}}", "{{m|Wanderers}}"
+            )
+
+    def _get_aliases(self, article: WikiArticle):
+        wikitext = parse(article.content)
+        if len(wikitext.templates) < 1:
+            return []
+        template = wikitext.templates[0]
+        if not template or not template.normal_name().strip().endswith(
+            "Character Template"
+        ):
+            return []
+        # TODO: Consider adding aliases/codenames/nicknames/etc.
+        current_alias = template.get_arg("CurrentAlias")
+        if not current_alias:
+            return []
+        return [parse(current_alias.value).plain_text().strip()]
 
     @wikitext_transformer
     def expand_membership(self, title: str, wikitext: WikiText):
@@ -65,11 +71,7 @@ class MarvelWiki(MediaWiki):
         The membership template automatically includes a character in a universe-specific group.
         See https://marvel.fandom.com/wiki/Module:Members.
         """
-        # TODO: Remove this when the wiki updates.
-        if title == "Egros (Earth-616)":
-            wikitext.string.replace(
-                "{{m[|[Wanderers (Earth-616)|Wanderers]]}}", "{{m|Wanderers}}"
-            )
+
         template = next(
             (
                 template
@@ -88,6 +90,7 @@ class MarvelWiki(MediaWiki):
             None,
         )
         if not template:
+            print(title)
             raise ParseException("No template included; cannot determine reality.")
         # TODO: Handle "Moira" edge cases (see https://marvel.fandom.com/wiki/Module:Reality)
         reality = template.get_arg("Reality")
@@ -102,16 +105,10 @@ class MarvelWiki(MediaWiki):
 
     @wikitext_transformer
     def expand_character_template(self, title: str, wikitext: WikiText):
-        template = next(
-            (
-                template
-                for template in wikitext.templates
-                if template.normal_name().replace("Marvel Database:", "").strip()
-                in ["Character Template"]
-            ),
-            None,
-        )
-        if not template:
+        template = wikitext.templates[0]
+        if not template or not template.normal_name().strip().endswith(
+            "Character Template"
+        ):
             logger.info(
                 "%s does not use a character template; are they really a character?"
             )
@@ -144,7 +141,11 @@ class MarvelWiki(MediaWiki):
             "AdditionalAttributes",
             "===Additional Attributes===",  # TODO: Check if this header is correct.
         )
-        if "Equipment" or "Transportation" in arguments or "Weapons" in arguments:
+        if (
+            arguments.get("Equipment")
+            or arguments.get("Transportation")
+            or arguments.get("Weapons")
+        ):
             new_sections.append("==Paraphernalia==")
         add_section("Equipment", "===Equipment===")
         add_section("Transportation", "===Transportation===")
@@ -172,3 +173,15 @@ class MarvelWiki(MediaWiki):
                 return template.arguments[-1].value
 
         replace_templates(wikitext, link_replacer)
+
+    def article_filter(self, article: WikiArticle):
+        return super().article_filter(article) and any(
+            re.finditer(CHARACTER_PATTERN, article.content)
+        )
+
+    def all_character_names(self) -> Iterable[str]:
+        return (
+            article.title
+            for article in self.all_articles()
+            if self.article_filter(article)
+        )

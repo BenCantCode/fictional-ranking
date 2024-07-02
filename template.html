@@ -1,0 +1,117 @@
+<html>
+
+<head>
+    <title>Tier List</title>
+    <style>
+        body {
+            background-color: #222;
+            color: #CCC;
+            font-family: "Fira Sans Condensed";
+            font-weight: bold;
+        }
+
+        .tier {
+            display: flex;
+            flex-direction: row;
+            border-radius: 5px;
+            border: 2px solid #CCC;
+            margin: 10px;
+        }
+
+        .character_list {
+            display: grid;
+            flex-grow: 1;
+            gap: 10px;
+            padding: 10px;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+        }
+
+        .character {
+            display: flex;
+            flex-direction: column;
+            aspect-ratio: 4/5;
+            flex-grow: 1;
+            flex-basis: 0;
+            text-align: center;
+            padding: 5px;
+            background: #111;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .character img {
+            width: 100%;
+            height: auto;
+            aspect-ratio: 1;
+            object-fit: cover;
+            object-position: center top;
+        }
+
+        .character p {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+        }
+
+        .grade {
+            color: #222;
+            width: 50px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+        }
+
+        .tier-S .grade {
+            background: #ff7f7e;
+        }
+
+        .tier-A .grade {
+            background: #ffbf7f;
+        }
+
+        .tier-B .grade {
+            background: #feff7f;
+        }
+
+        .tier-C .grade {
+            background: #83ff82;
+        }
+
+        .tier-D .grade {
+            background: #7fffff;
+        }
+
+        .tier-E .grade {
+            background: #807fff;
+        }
+
+        .tier-F .grade {
+            background: #8584ff;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="tiers">
+        {% for grade, characters in tiers.items() %}
+        <div class="tier tier-{{grade}}">
+            <h2 class="grade">{{ grade }}</h2>
+            <div class="character_list">
+                {% for character in characters %}
+                <div class="character">
+                    <img src="{{character.image or 'https://upload.wikimedia.org/wikipedia/commons/2/2c/Default_pfp.svg'}}"
+                        loading="lazy" />
+                    <p>{{character.name}}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</body>
+
+</html>

@@ -1,10 +1,13 @@
 from __future__ import annotations
 from typing import Iterable
-from urllib.request import urlretrieve
+from urllib.parse import quote_plus
+
+from aiolimiter import AsyncLimiter
 from mediawiki import (
     MediaWiki,
     WikiArticle,
     combine_subpages,
+    replace_templates,
     wikitext_transformer,
     DeepPagesList,
 )
@@ -12,6 +15,9 @@ from character import Character, CharacterId, Section
 import wikitextparser as wtp
 from wikitextparser import Template, WikiText
 from os.path import exists, join
+from config import ASYNC_CLIENT
+from httpx import AsyncClient
+
 
 DEFAULT_TAB_SUBPAGES = set(
     [
@@ -76,7 +82,10 @@ class OnePieceWiki(MediaWiki):
         "references": 0,
     }
 
-    IMAGE_BASE_URL = "https://archive.org/download/wiki-onepiece.fandom.com-20231227/onepiece.fandom.com-20231227-images.7z/images/"
+    # IANAL, but...
+    # Archive.org's robots.txt file is very forgiving, and their TOS allows usage "for scholarship and research purposes."
+    # Since we're compiling data from many different works, I think this counts as "research."
+    IMAGE_BASE_URL = "https://ia804607.us.archive.org/view_archive.php?archive=/1/items/wiki-onepiece.fandom.com-20231227/onepiece.fandom.com-20231227-images.7z&file=images/"
 
     IMAGE_LOCATIONS = [
         "{character.name} Anime Post Timeskip Infobox.png",
@@ -165,9 +174,11 @@ class OnePieceWiki(MediaWiki):
 
     @wikitext_transformer
     def expand_nihongo(self, title: str, wikitext: WikiText):
-        for template in wikitext.templates:
-            if template.normal_name() == "nihongo":
-                template.string = template.arguments[0].value
+        def replace_nihongo(template: Template):
+            if template.normal_name(capitalize=True) == "Nihongo":
+                return template.arguments[0].value
+
+        replace_templates(wikitext, replace_nihongo)
 
     def all_character_names(self) -> Iterable[str]:
         character_names = set()
@@ -198,16 +209,38 @@ class OnePieceWiki(MediaWiki):
         for character_name in self.all_character_names():
             yield self.get_character(character_name)
 
-    def get_image(self, character: Character) -> str | None:
+    async def get_image(
+        self,
+        character: Character,
+        rate_limit: AsyncLimiter,
+        async_client: AsyncClient = ASYNC_CLIENT,
+        download_if_unavailable: bool = True,
+    ) -> str | None:
+        # First, check if a local version exists
         for location in self.IMAGE_LOCATIONS:
             location = location.format(character=character)
             local_path = join(self.image_path, location)
             if exists(local_path):
-                return join(self.image_path, location)
-            elif ("File:" + location) in self.articles:
-                urlretrieve(
-                    self.IMAGE_BASE_URL + location.replace(" ", "_"),
-                    local_path,
-                )
                 return local_path
+        if not download_if_unavailable:
+            return None
+        # Next, check if a remote version exists
+        for location in self.IMAGE_LOCATIONS:
+            location = location.format(character=character)
+            local_path = join(self.image_path, location)
+            if ("File:" + location) in self.articles:
+                async with rate_limit:
+                    res = await async_client.get(
+                        self.IMAGE_BASE_URL + quote_plus(location.replace(" ", "_"))
+                    )
+                if res.status_code == 400:
+                    continue
+                elif res.status_code != 200:
+                    raise ValueError(f"Couldn't download image: {res.status_code}")
+                if len(res.content) == 0:
+                    continue
+                with open(local_path, "wb") as local_image:
+                    local_image.write(res.content)
+                return local_path
+
         return None

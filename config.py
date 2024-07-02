@@ -55,14 +55,14 @@ NUM_RETRIES = 10
 PROMPT = "prompt_end.toml"
 
 # Model (see LiteLLM docs)
-MODEL = "command-r-plus"
-# MODEL = "claude-3-haiku-20240307"
+# MODEL = "command-r-plus"
+MODEL = "claude-3-haiku-20240307"
 # MODEL = "claude-3-5-sonnet-20240620"
 
 # For rating generation
 DEFAULT_RATING = 1500
 SCALE_FACTOR = 400
-ALPHA = 0.00001  # Regularization parameter.
+ALPHA = 0.0001  # Regularization parameter.
 
 # How much to weigh the result of each model.
 MODEL_SCALING = {

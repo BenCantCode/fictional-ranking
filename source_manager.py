@@ -20,7 +20,7 @@ class SourceManager:
     async def load_source(self, source_id: str):
         if source_id not in self.sources:
             source = AVAILABLE_SOURCES[source_id](self.download_path)
-            self.sources[source_id] = AVAILABLE_SOURCES[source_id](self.download_path)
+            self.sources[source_id] = source
             await source.load()
             return source
         else:
@@ -29,6 +29,11 @@ class SourceManager:
     @functools.lru_cache(maxsize=8192)
     def get_character(self, character_id: CharacterId):
         return self.sources[character_id.source_id].get_character(character_id.name)
+
+    def get_character_length_estimate(self, character_id: CharacterId):
+        return self.sources[character_id.source_id].get_character_length_estimate(
+            character_id.name
+        )
 
     def all_characters(self) -> Iterable[Character]:
         for source in self.sources.values():
