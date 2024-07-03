@@ -171,6 +171,8 @@ class Evaluator:
             return character_b
         logger.warn("Complex result: %s", winner_raw)
         # If they don't match, return whichever has more overlap
+        if len(winner_raw) > 100:
+            raise InvalidResult("Result too long.")
         overlap_a = 0
         overlap_b = 0
         winner_raw_parts = self._name_parts(winner_raw)
