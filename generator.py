@@ -7,6 +7,7 @@ from character_filter import CharacterFilter
 from match_filter import MatchFilter
 from matchmaking import Matchmaker
 from type_registrar import TypeRegistrar
+from tqdm import tqdm
 
 if TYPE_CHECKING:
     from run import Run
@@ -56,16 +57,22 @@ class Generator:
         self, run: Run, source_manager: SourceManager, db: RunsDatabase | None
     ) -> Iterable[PreparedMatch]:
         character_ids_set: set[CharacterId] = set()
+        print("Filtering Characters...")
         for potential_character_id in source_manager.all_character_ids():
             if self.character_filter.ok(potential_character_id, source_manager):
                 character_ids_set.add(potential_character_id)
+        print("Filtered Characters!")
         character_ids_list: list[CharacterId] = list(character_ids_set)
         matches = []
+        print("Generating Matches...")
         for (
             character_a_id,
             character_b_id,
-        ) in self.matchmaker.generate_matches(
-            character_ids_list, self.match_filter, matches
+        ) in tqdm(
+            self.matchmaker.generate_matches(
+                character_ids_list, self.match_filter, matches, source_manager
+            ),
+            total=len(character_ids_set),
         ):
             character_a = source_manager.get_character(character_a_id)
             character_b = source_manager.get_character(character_b_id)
@@ -77,3 +84,4 @@ class Generator:
             )
             yield match
             matches.append(match)
+        print("Generated Matches!")

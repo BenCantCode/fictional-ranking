@@ -1,23 +1,15 @@
 from __future__ import annotations
 from typing import Iterable
-from urllib.parse import quote_plus
-
-from aiolimiter import AsyncLimiter
 from mediawiki import (
     MediaWiki,
     WikiArticle,
     combine_subpages,
     replace_templates,
     wikitext_transformer,
-    DeepPagesList,
 )
-from character import Character, CharacterId, Section
+from character import Character
 import wikitextparser as wtp
 from wikitextparser import Template, WikiText
-from os.path import exists, join
-from config import ASYNC_CLIENT
-from httpx import AsyncClient
-
 
 DEFAULT_TAB_SUBPAGES = set(
     [
@@ -44,6 +36,8 @@ INCLUDE_CHARACTER_NAMES = []
 
 class OnePieceWiki(MediaWiki):
     SOURCE_ID = "one_piece"
+
+    WIKI_URL = "https://onepiece.fandom.com/wiki"
 
     DUMP_URL = (
         "https://s3.amazonaws.com/wikia_xml_dumps/o/on/onepiece_pages_current.xml.7z"
@@ -82,17 +76,12 @@ class OnePieceWiki(MediaWiki):
         "references": 0,
     }
 
-    # IANAL, but...
-    # Archive.org's robots.txt file is very forgiving, and their TOS allows usage "for scholarship and research purposes."
-    # Since we're compiling data from many different works, I think this counts as "research."
-    IMAGE_BASE_URL = "https://ia804607.us.archive.org/view_archive.php?archive=/1/items/wiki-onepiece.fandom.com-20231227/onepiece.fandom.com-20231227-images.7z&file=images/"
-
     IMAGE_LOCATIONS = [
-        "{character.name} Anime Post Timeskip Infobox.png",
-        "{character.name} Manga Post Timeskip Infobox.png",
-        "{character.name} Anime Infobox.png",
-        "{character.name} Manga Infobox.png",
-        "{character.name} Infobox.png",
+        "{title} Anime Post Timeskip Infobox.png",
+        "{title} Manga Post Timeskip Infobox.png",
+        "{title} Anime Infobox.png",
+        "{title} Manga Infobox.png",
+        "{title} Infobox.png",
     ]
 
     # Extract relevant pages from a tab template
@@ -180,7 +169,7 @@ class OnePieceWiki(MediaWiki):
 
         replace_templates(wikitext, replace_nihongo)
 
-    def all_character_names(self) -> Iterable[str]:
+    def _all_character_names(self) -> Iterable[str]:
         character_names = set()
         for character_list in self.articles_starting_with(
             "List of Canon Characters/Names"
@@ -205,42 +194,15 @@ class OnePieceWiki(MediaWiki):
             character_names.add(character)
         return character_names
 
-    def all_characters(self) -> Iterable[Character]:
-        for character_name in self.all_character_names():
-            yield self.get_character(character_name)
+    def is_valid_character(self, name: str, article: WikiArticle):
+        return (
+            super().is_valid_character(name, article)
+            and name in self.all_character_names()
+        )
 
-    async def get_image(
-        self,
-        character: Character,
-        rate_limit: AsyncLimiter,
-        async_client: AsyncClient = ASYNC_CLIENT,
-        download_if_unavailable: bool = True,
-    ) -> str | None:
-        # First, check if a local version exists
+    def extract_image_name(self, title: str, parsed: WikiText) -> str | None:
         for location in self.IMAGE_LOCATIONS:
-            location = location.format(character=character)
-            local_path = join(self.image_path, location)
-            if exists(local_path):
-                return local_path
-        if not download_if_unavailable:
-            return None
-        # Next, check if a remote version exists
-        for location in self.IMAGE_LOCATIONS:
-            location = location.format(character=character)
-            local_path = join(self.image_path, location)
+            location = location.format(title=title)
             if ("File:" + location) in self.articles:
-                async with rate_limit:
-                    res = await async_client.get(
-                        self.IMAGE_BASE_URL + quote_plus(location.replace(" ", "_"))
-                    )
-                if res.status_code == 400:
-                    continue
-                elif res.status_code != 200:
-                    raise ValueError(f"Couldn't download image: {res.status_code}")
-                if len(res.content) == 0:
-                    continue
-                with open(local_path, "wb") as local_image:
-                    local_image.write(res.content)
-                return local_path
-
+                return location
         return None

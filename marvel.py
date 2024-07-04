@@ -1,3 +1,4 @@
+from functools import cache
 from mediawiki import (
     MediaWiki,
     WikiArticle,
@@ -6,7 +7,7 @@ from mediawiki import (
     Template,
 )
 from wikitextparser import WikiText, parse, Section
-from exceptions import ParseException
+from exceptions import NotACharacterException, ParseException
 import logging
 from typing import Iterable
 from character import Character
@@ -25,6 +26,8 @@ class MarvelWiki(MediaWiki):
     DUMP_URL = "https://s3.amazonaws.com/wikia_xml_dumps/e/en/enmarveldatabase_pages_current.xml.7z"
     DUMP_FORMAT = "7z"
 
+    WIKI_URL = "https://marvel.fandom.com/wiki"
+
     SECTION_PRIORITY = {
         "introduction": 10,
         "attributes": 10,
@@ -42,25 +45,28 @@ class MarvelWiki(MediaWiki):
     }
 
     # TODO: Remove this when the wiki updates.
-    @wikitext_transformer
+    @wikitext_transformer(removes_information=False)
     def fix_egros(self, title: str, wikitext: WikiText):
-
         if title == "Egros (Earth-616)":
             wikitext.string = wikitext.string.replace(
                 "{{m[|[Wanderers (Earth-616)|Wanderers]]}}", "{{m|Wanderers}}"
             )
 
-    def _get_aliases(self, article: WikiArticle):
-        wikitext = parse(article.content)
-        if len(wikitext.templates) < 1:
-            return []
-        template = wikitext.templates[0]
-        if not template or not template.normal_name().strip().endswith(
-            "Character Template"
-        ):
-            return []
-        # TODO: Consider adding aliases/codenames/nicknames/etc.
-        current_alias = template.get_arg("CurrentAlias")
+    def _get_character_template(self, wikitext: WikiText) -> Template | None:
+        return next(
+            (
+                template
+                for template in wikitext.templates
+                if template.normal_name().strip().endswith("Character Template")
+            ),
+            None,
+        )
+
+    def extract_aliases(self, title: str, parsed: WikiText):
+        character_template = self._get_character_template(parsed)
+        if character_template is None:
+            raise NotACharacterException(title)
+        current_alias = character_template.get_arg("CurrentAlias")
         if not current_alias:
             return []
         return [parse(current_alias.value).plain_text().strip()]
@@ -90,7 +96,6 @@ class MarvelWiki(MediaWiki):
             None,
         )
         if not template:
-            print(title)
             raise ParseException("No template included; cannot determine reality.")
         # TODO: Handle "Moira" edge cases (see https://marvel.fandom.com/wiki/Module:Reality)
         reality = template.get_arg("Reality")
@@ -105,12 +110,8 @@ class MarvelWiki(MediaWiki):
 
     @wikitext_transformer
     def expand_character_template(self, title: str, wikitext: WikiText):
-        template = next(
-            template
-            for template in wikitext.templates
-            if template.normal_name().strip().endswith("Character Template")
-        )
-        if not template:
+        character_template = self._get_character_template(wikitext)
+        if not character_template:
             logger.info(
                 "%s does not use a character template; are they really a character?",
                 title,
@@ -118,7 +119,8 @@ class MarvelWiki(MediaWiki):
             return
 
         arguments = dict(
-            (arg.name.strip(), arg.value.strip()) for arg in template.arguments
+            (arg.name.strip(), arg.value.strip())
+            for arg in character_template.arguments
         )
 
         new_sections = []
@@ -177,14 +179,20 @@ class MarvelWiki(MediaWiki):
 
         replace_templates(wikitext, link_replacer)
 
-    def article_filter(self, article: WikiArticle):
-        return super().article_filter(article) and any(
+    def is_valid_character(self, name: str, article: WikiArticle):
+        return super().is_valid_character(name, article) and any(
             re.finditer(CHARACTER_PATTERN, article.content)
         )
 
-    def all_character_names(self) -> Iterable[str]:
-        return (
-            article.title
-            for article in self.all_articles()
-            if self.article_filter(article)
-        )
+    def extract_image_name(self, title: str, wikitext: WikiText):
+        character_box = self._get_character_template(wikitext)
+        if not character_box:
+            logger.info(
+                "%s does not use a character template; are they really a character?",
+                title,
+            )
+            return
+        image = character_box.get_arg("Image")
+        if image is None:
+            return None
+        return image.value.strip()

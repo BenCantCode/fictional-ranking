@@ -56,8 +56,8 @@ PROMPT = "prompt_end.toml"
 
 # Model (see LiteLLM docs)
 # MODEL = "command-r-plus"
-# MODEL = "claude-3-haiku-20240307"
-MODEL = "claude-3-5-sonnet-20240620"
+MODEL = "claude-3-haiku-20240307"
+# MODEL = "claude-3-5-sonnet-20240620"
 
 # For rating generation
 DEFAULT_RATING = 1500

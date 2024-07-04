@@ -3,9 +3,10 @@ from __future__ import annotations
 from abc import abstractmethod
 from character import CharacterId
 from typing import Any
-import json
 from match import MatchResult, Outcome, PreparedMatch
+from source_manager import SourceManager
 from type_registrar import Type, TypeRegistrar
+from character_filter import CharacterFilter
 
 
 MATCH_FILTER_TYPE_REGISTRAR = TypeRegistrar["MatchFilter"]()
@@ -17,6 +18,7 @@ class MatchFilter(Type):
         self,
         potential_match: tuple[CharacterId, CharacterId],
         matches: list[PreparedMatch],
+        source_manger: SourceManager,
     ):
         raise NotImplementedError()
 
@@ -81,9 +83,10 @@ class OrFilter(MatchFilter):
         self,
         match: tuple[CharacterId, CharacterId],
         matches: list[PreparedMatch],
+        source_manger: SourceManager,
     ):
         for subfilter in self.subfilters:
-            if subfilter.ok(match, matches):
+            if subfilter.ok(match, matches, source_manger):
                 return True
         return False
 
@@ -112,9 +115,10 @@ class AndFilter(MatchFilter):
         self,
         match: tuple[CharacterId, CharacterId],
         matches: list[PreparedMatch],
+        source_manger: SourceManager,
     ):
         for subfilter in self.subfilters:
-            if not subfilter.ok(match, matches):
+            if not subfilter.ok(match, matches, source_manger):
                 return False
         return True
 
@@ -138,8 +142,9 @@ class InvertFilter(MatchFilter):
         self,
         match: tuple[CharacterId, CharacterId],
         matches: list[PreparedMatch],
+        source_manger: SourceManager,
     ):
-        return not self.subfilter.ok(match, matches)
+        return not self.subfilter.ok(match, matches, source_manger)
 
 
 def or_filter(a, b):
@@ -197,21 +202,20 @@ class DuplicateMatchInRunFilter(MatchFilter):
         self,
         match: tuple[CharacterId, CharacterId],
         matches: list[PreparedMatch],
+        source_manger: SourceManager,
     ):
-        if any(
-            prior_match
-            for prior_match in matches
-            if prior_match.character_a.id == match[0]
-            and prior_match.character_b.id == match[1]
-        ):
-            return True
-        if not self.order_dependent and any(
-            prior_match
-            for prior_match in matches
-            if prior_match.character_b.id == match[0]
-            and prior_match.character_a.id == match[1]
-        ):
-            return True
+        for prior_match in matches:
+            if (
+                prior_match.character_a.id == match[0]
+                and prior_match.character_b.id == match[1]
+            ):
+                return True
+            if (
+                (not self.order_dependent)
+                and prior_match.character_b.id == match[0]
+                and prior_match.character_a.id == match[1]
+            ):
+                return True
         return False
 
 
@@ -257,6 +261,7 @@ class DuplicateMatchInPriorRunFilter(MatchFilter):
         self,
         match: tuple[CharacterId, CharacterId],
         matches: list[PreparedMatch],
+        source_manger: SourceManager,
     ):
         num = 0
         for prior_match in self.prior_matches:
@@ -287,6 +292,7 @@ class SelfMatchFilter(MatchFilter):
         self,
         potential_match: tuple[CharacterId, CharacterId],
         matches: list[PreparedMatch],
+        source_manger: SourceManager,
     ):
         return potential_match[0] == potential_match[1]
 
@@ -312,6 +318,7 @@ class CharacterMatchesThresholdFilter(MatchFilter):
         self,
         potential_match: tuple[CharacterId, CharacterId],
         matches: list[PreparedMatch],
+        source_manger: SourceManager,
     ):
         b_id = potential_match[1]
         b_matches = 1
@@ -320,4 +327,57 @@ class CharacterMatchesThresholdFilter(MatchFilter):
                 b_matches += 1
                 if b_matches > self.threshold:
                     return True
+        return False
+
+
+@MATCH_FILTER_TYPE_REGISTRAR.register("character_filter")
+class MatchCharacterFilter(MatchFilter):
+    """Imposes a CharacterFilter on either or both characters."""
+
+    def __init__(
+        self,
+        a_filter: CharacterFilter | None,
+        b_filter: CharacterFilter | None,
+        order_dependent=False,
+    ):
+        self.a_filter = a_filter
+        self.b_filter = b_filter
+        self.order_dependent = order_dependent
+
+    @property
+    def parameters(self):
+        return {
+            "a_filter": self.a_filter.to_object() if self.a_filter else None,
+            "b_filter": self.b_filter.to_object() if self.b_filter else None,
+            "order_dependent": self.order_dependent,
+        }
+
+    @staticmethod
+    def from_parameters(
+        parameters: dict[str, Any], registrar: TypeRegistrar[MatchFilter]
+    ) -> MatchCharacterFilter:
+        raise NotImplementedError("Deserializing MatchCharacterFilter")
+
+    def ok(
+        self,
+        potential_match: tuple[CharacterId, CharacterId],
+        matches: list[PreparedMatch],
+        source_manger: SourceManager,
+    ):
+        # A matches A
+        if self.a_filter is None or self.a_filter.ok(potential_match[0], source_manger):
+            # B matches B
+            if self.b_filter is None or self.b_filter.ok(
+                potential_match[1], source_manger
+            ):
+                return True
+        # A matches B
+        if not self.order_dependent and (
+            self.a_filter is None or self.a_filter.ok(potential_match[1], source_manger)
+        ):
+            # B matches A
+            if self.b_filter is None or self.b_filter.ok(
+                potential_match[0], source_manger
+            ):
+                return True
         return False

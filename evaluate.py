@@ -214,7 +214,6 @@ class Evaluator:
                     return await acompletion(
                         model=model, messages=messages, **completion_args
                     )  # type: ignore
-                raise Exception("Impossible?")
             except (APIConnectionError, RateLimitError, BadRequestError) as e:
                 logger.warn("Completion attempt failed: %s", str(e))
                 logger.warn("Retrying...")

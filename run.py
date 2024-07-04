@@ -13,7 +13,7 @@ from config import (
     REQUESTS_PER_INTERVAL,
     TOKENS_PER_INTERVAL,
 )
-from tqdm.asyncio import tqdm
+from tqdm.asyncio import tqdm as tqdm_async
 from math import ceil
 import logging
 
@@ -108,7 +108,6 @@ class Run:
         if self.db and not self.run_id:
             self.run_id = self.db.start_run(self)
         if self.remaining_matches == None:
-            print("Generating Matches...")
             if self.settings.generator == None:
                 raise ValueError("Cannot generate matches without a generator!")
             self.remaining_matches = list(
@@ -143,7 +142,7 @@ class Run:
                 self.results.append(result)
 
             coroutines.append(evaluate(match))
-        await tqdm.gather(*coroutines)
+        await tqdm_async.gather(*coroutines)
         print("Done!")
         if self.db:
             self.db.end_run(self, True)

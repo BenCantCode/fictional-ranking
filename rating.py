@@ -70,8 +70,6 @@ def rate_characters(
             if filter.ok(result.character_a.id, source_manager)
             and filter.ok(result.character_b.id, source_manager)
         ]
-    else:
-        results = results.copy()
     n, id_to_int, int_to_id = _map_characters(results)
     matrix = _results_to_matrix(n, results, id_to_int, model_scaling)
     raw_rankings = ilsr_pairwise_dense(matrix, alpha=ALPHA)
@@ -80,3 +78,30 @@ def rate_characters(
         for i in range(n)
     )
     return rankings
+
+
+def invert_ratings(ratings: dict[CharacterId, float]):
+    return dict(
+        (id, DEFAULT_RATING - (rating - DEFAULT_RATING))
+        for id, rating in ratings.items()
+    )
+
+
+def normalize_ratings(ratings: dict[CharacterId, float]) -> dict[CharacterId, float]:
+    """Normalize ratings based on min/max rating and center around `DEFAULT_VALUE`."""
+    normalized_ratings = {}
+    max_rating = max(ratings.values())
+    min_rating = min(ratings.values())
+    rating_range = max_rating - min_rating
+    for character_id, character_rating in ratings.items():
+        normalized_ratings[character_id] = (
+            ((character_rating - min_rating) / rating_range) * DEFAULT_RATING * 2
+        )
+    return normalized_ratings
+
+
+def ordinalize_ratings(ratings: dict[CharacterId, float]) -> dict[CharacterId, float]:
+    """Generate new ratings by sorting a previous set of ratings and evenly spacing values across an interval."""
+    sorted_ratings = sorted(ratings.keys(), key=lambda id: ratings[id])
+    ordinal_scale = DEFAULT_RATING * 2 / (len(ratings) - 1)
+    return {id: i * ordinal_scale for i, id in enumerate(sorted_ratings)}

@@ -56,7 +56,7 @@ class Character:
         self,
         id: CharacterId,
         revision: str,
-        sections: list[Section],
+        sections: list[Section] | None,
         source: Source | None,
         aliases: list[str] | None = None,
     ):
@@ -68,6 +68,8 @@ class Character:
 
     @property
     def full_text(self):
+        if self.sections is None:
+            raise ValueError("Character was initialized without sections.")
         return Section.combine_sections(self.sections)
 
     def abridged_text(
@@ -77,6 +79,8 @@ class Character:
         max_tokens: int | None = None,
         max_cost: float | None = None,
     ) -> str:
+        if self.sections is None:
+            raise ValueError("Character was initialized without sections.")
         abridged_sections = [
             section for section in self.sections if section.priority > 0
         ]
@@ -96,19 +100,6 @@ class Character:
             text = Section.combine_sections(abridged_sections)
         return text
 
-    async def get_image(
-        self,
-        rate_limit: AsyncLimiter,
-        async_client: AsyncClient = ASYNC_CLIENT,
-        download_if_unavailable: bool = True,
-    ) -> str | None:
-        if self.source:
-            return await self.source.get_image(
-                self, rate_limit, async_client, download_if_unavailable
-            )
-        else:
-            raise NotImplementedError("Getting images without a loaded source.")
-
     @property
     def name(self) -> str:
         return self.id.name
@@ -116,3 +107,8 @@ class Character:
     @property
     def source_id(self) -> str:
         return self.id.source_id
+
+    def get_image_url(
+        self, max_width: int | None = None, max_height: int | None = None
+    ) -> str | None:
+        return None

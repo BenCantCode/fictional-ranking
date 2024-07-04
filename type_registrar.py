@@ -21,7 +21,7 @@ class TypeRegistrar(Generic[T]):
         self.types: dict[str, type[T]] = dict()
 
     def register(self, id: str):
-        def registered(cls: type[T]) -> Any:
+        def registered(cls):
             cls.TYPE_ID = id
             self.types[id] = cls
             return cls

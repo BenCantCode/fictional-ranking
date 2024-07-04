@@ -4,11 +4,14 @@ import time
 from character import CharacterId
 from random import Random, getrandbits
 from typing import Iterable, Any
-from match import PreparedMatch
+from match import MatchResult, PreparedMatch
 from match_filter import MatchFilter
+from source_manager import SourceManager
 from type_registrar import Type, TypeRegistrar
 import json
 from config import DEFAULT_RATING
+from rating import ordinalize_ratings, invert_ratings, rate_characters
+from character_filter import CharacterFilter
 
 MATCHMAKER_TYPE_REGISTRAR = TypeRegistrar["Matchmaker"]()
 
@@ -22,6 +25,7 @@ class Matchmaker(Type):
         characters: list[CharacterId],
         match_filter: MatchFilter,
         matches: list[PreparedMatch],
+        source_manager: SourceManager,
     ) -> Iterable[tuple[CharacterId, CharacterId]]:
         raise NotImplementedError()
 
@@ -62,6 +66,7 @@ class RandomMatchmaker(Matchmaker):
         character_ids: list[CharacterId],
         filter: MatchFilter,
         matches: list[PreparedMatch],
+        source_manager: SourceManager,
     ) -> Iterable[tuple[CharacterId, CharacterId]]:
         random = Random(self.seed)
         for character_id in character_ids:
@@ -71,7 +76,7 @@ class RandomMatchmaker(Matchmaker):
                     random.randint(0, len(possible_opponent_ids) - 1)
                 ]
                 match = (character_id, opponent_id)
-                if filter.ok(match, matches):
+                if filter.ok(match, matches, source_manager):
                     yield match
                     break
                 possible_opponent_ids.remove(opponent_id)
@@ -99,6 +104,7 @@ class PowermatchingMatchmaker(Matchmaker):
         character_ids: list[CharacterId],
         filter: MatchFilter,
         matches: list[PreparedMatch],
+        source_manager: SourceManager,
     ) -> Iterable[tuple[CharacterId, CharacterId]]:
         for character_id in character_ids:
             rating = self.ratings.get(character_id, DEFAULT_RATING)
@@ -110,7 +116,7 @@ class PowermatchingMatchmaker(Matchmaker):
             )
             for opponent_id in distances:
                 match = (character_id, opponent_id)
-                if filter.ok(match, matches):
+                if filter.ok(match, matches, source_manager):
                     yield match
                     break
 
@@ -123,3 +129,50 @@ class PowermatchingMatchmaker(Matchmaker):
     @property
     def parameters(self) -> dict[str, Any]:
         return {}
+
+
+@MATCHMAKER_TYPE_REGISTRAR.register("inverted_ordinalized_powermatched")
+class InvertedOrdinalizedPowermatchingMatchmaker(PowermatchingMatchmaker):
+    def __init__(
+        self,
+        ratings: dict[CharacterId, float],
+        a_filter: CharacterFilter,
+        b_filter: CharacterFilter,
+        source_manager: SourceManager,
+    ):
+        self.a_filter = a_filter
+        self.b_filter = b_filter
+        a_ratings = ordinalize_ratings(
+            {
+                id: rating
+                for id, rating in ratings.items()
+                if a_filter.ok(id, source_manager)
+            }
+        )
+        b_ratings = invert_ratings(
+            ordinalize_ratings(
+                {
+                    id: rating
+                    for id, rating in ratings.items()
+                    if b_filter.ok(id, source_manager)
+                }
+            )
+        )
+        with open("a_ordinalized_ratings.txt", "w") as a_ratings_file:
+            for id, rating in sorted(a_ratings.items(), key=lambda t: t[1]):
+                a_ratings_file.write(f"{id}: {rating}\n")
+        with open("b_ordinalized_inverted_ratings.txt", "w") as b_ratings_file:
+            for id, rating in sorted(b_ratings.items(), key=lambda t: t[1]):
+                b_ratings_file.write(f"{id}: {rating}\n")
+        ratings = a_ratings | b_ratings
+        with open("combined_ordinalized_inverted_ratings.txt", "w") as ratings_file:
+            for id, rating in sorted(ratings.items(), key=lambda t: t[1]):
+                ratings_file.write(f"{id}: {rating}\n")
+        super().__init__(ratings)
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "a_filter": self.a_filter.to_object(),
+            "b_filter": self.b_filter.to_object(),
+        }

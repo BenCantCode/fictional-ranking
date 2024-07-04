@@ -7,6 +7,7 @@ from httpx import AsyncClient
 from character import Character, CharacterId
 from typing import Iterable, TYPE_CHECKING
 from config import ASYNC_CLIENT, DOWNLOADS_FOLDER
+from utils import copying_cache
 
 
 class Source(ABC):
@@ -46,31 +47,27 @@ class Source(ABC):
             self.parse()
 
     @abstractmethod
-    def get_character(self, character_name: str) -> Character:
+    def get_character(self, character_name: str, meta_only=False) -> Character:
         pass
 
     def get_character_length_estimate(self, character_name: str) -> int:
-        return sum(
-            len(section.text) for section in self.get_character(character_name).sections
-        )
-
-    async def get_image(
-        self,
-        character: Character,
-        rate_limit: AsyncLimiter,
-        async_client: AsyncClient = ASYNC_CLIENT,
-        download_if_unavailable: bool = True,
-    ) -> str | None:
-        return None
+        sections = self.get_character(character_name).sections
+        if sections is None:
+            raise ValueError("Character was initialized without sections.")
+        return sum(len(section.text) for section in sections)
 
     @abstractmethod
-    def all_characters(self) -> Iterable[Character]:
+    def _all_character_names(self) -> Iterable[str]:
         pass
 
-    def all_character_names(self) -> Iterable[str]:
-        for character in self.all_characters():
-            yield character.id.name
+    @copying_cache
+    def all_character_names(self) -> list[str]:
+        return list(self._all_character_names())
 
     def all_character_ids(self) -> Iterable[CharacterId]:
-        for character_name in self.all_character_names():
+        for character_name in self._all_character_names():
             yield CharacterId(self.SOURCE_ID, character_name)
+
+    def all_characters(self, meta_only: bool = False) -> Iterable[Character]:
+        for character_name in self.all_character_names():
+            yield self.get_character(character_name, meta_only=meta_only)

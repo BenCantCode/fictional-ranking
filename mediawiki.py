@@ -3,23 +3,21 @@ from datetime import datetime
 from typing import Iterable, Callable, TypeAlias, Union, IO
 from lxml.etree import iterparse, ElementBase
 from source import Source
-from urllib.request import urlretrieve
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, quote, urlencode
 import os
 from os.path import join, exists
 import pickle
 from character import CharacterId, Section, Character
 import wikitextparser as wtp
 from wikitextparser import Template, WikiText, WikiLink
-from wikitextparser._spans import parse_to_spans
 import re
 import zstandard
 import requests
 from py7zr import SevenZipFile
 from config import *
-from functools import wraps
 from exceptions import NotACharacterException
 from dateutil.parser import parse as parsedate
+from utils import copying_cache
 
 NAMESPACE = "http://www.mediawiki.org/xml/export-0.11/"
 
@@ -48,6 +46,24 @@ class WikiArticle:
         return f'(Article "{self.title}")'
 
 
+class MediaWikiCharacter(Character):
+    def __init__(self, *args, image_url: str | None = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._image_url = image_url
+
+    def get_image_url(
+        self, max_width: int | None = None, max_height: int | None = None
+    ) -> str | None:
+        if self._image_url is None:
+            return None
+        parameters = {}
+        if max_width is not None:
+            parameters["width"] = max_width
+        if max_height is not None:
+            parameters["height"] = max_height
+        return self._image_url + "?" + urlencode(parameters)
+
+
 DeepPagesList: TypeAlias = list[Union[WikiArticle, "DeepPagesList"]]
 
 
@@ -73,11 +89,18 @@ def combine_subpages(depth, pages: DeepPagesList) -> str:
 _transformer_count = 0
 
 
-def wikitext_transformer(method):
-    global _transformer_count
-    method._wikitext_transformer = _transformer_count
-    _transformer_count += 1
-    return method
+def wikitext_transformer(method=None, removes_information=True):
+    def inner_decorator(method):
+        global _transformer_count
+        method._wikitext_transformer = _transformer_count
+        method._removes_information = removes_information
+        _transformer_count += 1
+        return method
+
+    if method is not None:
+        return inner_decorator(method)
+    else:
+        return inner_decorator
 
 
 def replace_templates(wikitext: WikiText, replacer: Callable[[Template], str | None]):
@@ -118,6 +141,7 @@ class MediaWiki(Source):
     # The format of the dump (if it's an archive, it will be extracted)
     DUMP_FORMAT: str = "xml"
 
+    WIKI_URL: str | None = None
     API_URL: str | None = None
 
     # 10-0: Chance (out of 10) that the information is relevant.
@@ -241,16 +265,16 @@ class MediaWiki(Source):
             if page_title.startswith(title)
         )
 
-    def transform_wikitext(self, title: str, wikitext: WikiText):
+    def transform_wikitext(
+        self, title: str, wikitext: WikiText, remove_information: bool
+    ):
         for transformer in self.wikitext_transformers:
-            transformer(title, wikitext)
+            if transformer._removes_information == remove_information:
+                transformer(title, wikitext)
             # Hack to fix wikitext after transforming
             wikitext.__init__(wikitext.string)
 
-    def extract_sections(self, article: WikiArticle):
-        parsed = wtp.parse(article.content)
-        self.transform_wikitext(article.title, parsed)
-        # Extract sections
+    def extract_sections(self, parsed: WikiText):
         sections = []
         found_level = None
         found_priority = self.DEFAULT_SECTION_PRIORITY
@@ -259,50 +283,76 @@ class MediaWiki(Source):
             i += 1
             found = False
             if section.title != None:
-                title = section.title.strip()
-                if title.lower() in self.SECTION_PRIORITY:  # type: ignore
+                section_title = section.title.strip()
+                if section_title.lower() in self.SECTION_PRIORITY:  # type: ignore
                     found = True
                     found_level = section.level
-                    found_priority = self.SECTION_PRIORITY[title.lower()]  # type: ignore
+                    found_priority = self.SECTION_PRIORITY[section_title.lower()]  # type: ignore
             if not found and found_level != None and section.level <= found_level:
                 found_level = None
                 found_priority = self.DEFAULT_SECTION_PRIORITY
-            try:
-                sections.append(
-                    Section(
-                        re.sub("[\n]+", "\n", section.plain_text()),
-                        found_priority,
-                    )
+            sections.append(
+                Section(
+                    re.sub("[\n]+", "\n", section.plain_text()),
+                    found_priority,
                 )
-            except Exception as e:
-                print(article.title)
-                raise e
-        sections[0].text = "==Introduction==\n" + sections[0].text
-        sections[0].priority = self.SECTION_PRIORITY["introduction"]
+            )
+        # Add an introduction header if none exists
+        if not sections[0].text.startswith("="):
+            sections[0].text = "==Introduction==\n" + sections[0].text
+            sections[0].priority = self.SECTION_PRIORITY["introduction"]
         return sections
 
-    def _get_aliases(self, article: WikiArticle):
+    def extract_aliases(self, title, parsed: WikiText):
         return []
 
-    def character_from_article(self, article: WikiArticle) -> Character:
-        aliases = self._get_aliases(article)
-        return Character(
-            CharacterId(self.SOURCE_ID, article.title),
+    def extract_image_name(self, title: str, parsed: WikiText):
+        return None
+
+    def extract_image_url(self, title: str, parsed: WikiText):
+        image_name = self.extract_image_name(title, parsed)
+        if image_name is None:
+            return None
+        return f"{self.WIKI_URL}/Special:Redirect/file/{quote(image_name)}"
+
+    def character_from_article(
+        self, name: str, article: WikiArticle, meta_only=False
+    ) -> Character:
+        if not self.is_valid_character(name, article):
+            raise NotACharacterException(name)
+        parsed = wtp.parse(article.content)
+        # Apply wikitext transformers that don't remove information (e.g. to fix broken pages).
+        self.transform_wikitext(article.title, parsed, False)
+        aliases = self.extract_aliases(article.title, parsed)
+        image_url = self.extract_image_url(article.title, parsed)
+        sections = None
+        if not meta_only:
+            # Apply wikitext transformers that may remove information to prepare for plain text conversion.
+            self.transform_wikitext(article.title, parsed, True)
+            # Convert wikitext to plain text sections.
+            sections = self.extract_sections(parsed)
+        return MediaWikiCharacter(
+            CharacterId(self.SOURCE_ID, name),
             str(article.revision),
-            self.extract_sections(article),
+            sections,
             self,
             aliases,
+            image_url=image_url,
         )
 
-    def get_character(self, character_name: str) -> Character:
-        article = self.get_article(character_name)
-        if article == None or not self.article_filter(article):
-            raise NotACharacterException(character_name)
+    def resolve_redirects(self, article: WikiArticle) -> WikiArticle:
         while article.content.startswith("#REDIRECT"):
-            article = self.get_article(wtp.parse(article.content).wikilinks[0].title)
-            if article == None:
+            article = self.get_article(wtp.parse(article.content).wikilinks[0].title)  # type: ignore
+            if article is None:
                 raise ValueError("Redirect goes to nonexistent page!")
-        return self.character_from_article(article)
+        return article
+
+    def get_character(self, character_name: str, meta_only=False) -> Character:
+        article = self.get_article(character_name)
+        if article == None:
+            raise NotACharacterException(character_name)
+        article = self.resolve_redirects(article)
+        return self.character_from_article(character_name, article, meta_only=meta_only)
 
     def get_character_length_estimate(self, character_name: str) -> int:
         if character_name in self.articles:
@@ -310,16 +360,22 @@ class MediaWiki(Source):
         else:
             raise NotACharacterException(character_name)
 
-    def article_filter(self, article: WikiArticle):
+    def is_valid_character(
+        self,
+        name: str,
+        article: WikiArticle,
+    ):
         return article.namespace == 0
 
+    def _all_character_names(self) -> Iterable[str]:
+        for title, article in self.articles.items():
+            if self.is_valid_character(title, article):
+                yield article.title
+
     def all_characters(self) -> Iterable[Character]:
-        for article in self.all_articles():
-            if self.article_filter(article):
-                try:
-                    yield self.character_from_article(article)
-                except NotACharacterException:
-                    pass
+        for name in self.all_character_names():
+            article = self.articles[name]
+            yield self.character_from_article(name, article)
 
     @wikitext_transformer
     def remove_images(self, title, wikitext: WikiText):

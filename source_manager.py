@@ -27,8 +27,10 @@ class SourceManager:
             return self.sources[source_id]
 
     @functools.lru_cache(maxsize=8192)
-    def get_character(self, character_id: CharacterId):
-        return self.sources[character_id.source_id].get_character(character_id.name)
+    def get_character(self, character_id: CharacterId, meta_only=False):
+        return self.sources[character_id.source_id].get_character(
+            character_id.name, meta_only=meta_only
+        )
 
     def get_character_length_estimate(self, character_id: CharacterId):
         return self.sources[character_id.source_id].get_character_length_estimate(
