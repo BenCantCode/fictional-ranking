@@ -138,28 +138,14 @@ class InvertFilter(CharacterFilter):
 
 
 def _or_filter(a, b) -> OrFilter:
-    if isinstance(a, OrFilter):
-        a.subfilters.append(b)
-        return a
-    elif isinstance(b, OrFilter):
-        b.subfilters.append(a)
-        return b
-    else:
-        return OrFilter(a, b)
+    return OrFilter(a, b)
 
 
 CharacterFilter.__or__ = _or_filter  # type: ignore
 
 
 def _and_filter(a, b):
-    if isinstance(a, AndFilter):
-        a.subfilters.append(b)
-        return a
-    elif isinstance(b, AndFilter):
-        b.subfilters.append(a)
-        return b
-    else:
-        return AndFilter(a, b)
+    return AndFilter(a, b)
 
 
 CharacterFilter.__and__ = _and_filter  # type: ignore
@@ -223,10 +209,10 @@ class CharacterNameFilter(CharacterFilter):
 class SourceFilter(CharacterFilter):
     """Matches characters from specific sources."""
 
-    source_ids: list[str]
+    source_ids: set[str]
 
-    def __init__(self, source_ids: list[str] = []):
-        self.source_ids = source_ids
+    def __init__(self, *source_ids: str):
+        self.source_ids = set(source_ids)
 
     def ok(self, character_id: CharacterId, source_manager: SourceManager):
         return character_id.source_id in self.source_ids
@@ -239,7 +225,7 @@ class SourceFilter(CharacterFilter):
     def from_parameters(
         parameters: dict[str, Any], registrar: TypeRegistrar[CharacterFilter]
     ) -> SourceFilter:
-        return SourceFilter(parameters["sources"])
+        return SourceFilter(*parameters["sources"])
 
 
 @CHARACTER_FILTER_TYPE_REGISTRAR.register("everything")
