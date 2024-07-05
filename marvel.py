@@ -28,6 +28,10 @@ class MarvelWiki(MediaWiki):
 
     WIKI_URL = "https://marvel.fandom.com/wiki"
 
+    IGNORE_CHARACTER_NAMES = [
+        "Adolf Hitler (Earth-616)"
+    ]  # Might be over cautious, but I don't want to get banned.
+
     SECTION_PRIORITY = {
         "introduction": 10,
         "attributes": 10,

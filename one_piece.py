@@ -22,17 +22,6 @@ DEFAULT_TAB_SUBPAGES = set(
     ]
 )
 
-# The "List of Canon Characters" isn't perfect.
-IGNORE_CHARACTER_NAMES = [
-    "Impel Down",
-    "Mock Town",
-    "Rocks Pirates",
-    "Belly",
-    "Sapoten Graveyard",
-    "Rock",
-]
-INCLUDE_CHARACTER_NAMES = []
-
 
 class OnePieceWiki(MediaWiki):
     SOURCE_ID = "one_piece"
@@ -43,6 +32,17 @@ class OnePieceWiki(MediaWiki):
         "https://s3.amazonaws.com/wikia_xml_dumps/o/on/onepiece_pages_current.xml.7z"
     )
     DUMP_FORMAT = "7z"
+
+    # The "List of Canon Characters" isn't perfect.
+    IGNORE_CHARACTER_NAMES = [
+        "Impel Down",
+        "Mock Town",
+        "Rocks Pirates",
+        "Belly",
+        "Sapoten Graveyard",
+        "Rock",
+        "Fude Fude no Mi",
+    ]
 
     SECTION_PRIORITY = {
         "introduction": 10,
@@ -188,10 +188,8 @@ class OnePieceWiki(MediaWiki):
             for row in data:
                 link = wtp.parse(row[1]).wikilinks[0]
                 character_names.add(link.title)
-        for character in IGNORE_CHARACTER_NAMES:
+        for character in self.IGNORE_CHARACTER_NAMES:
             character_names.discard(character)
-        for character in INCLUDE_CHARACTER_NAMES:
-            character_names.add(character)
         return character_names
 
     def is_valid_character(self, name: str, article: WikiArticle):

@@ -149,6 +149,8 @@ class MediaWiki(Source):
     SECTION_PRIORITY: dict[str, float] = {}
     DEFAULT_SECTION_PRIORITY = 2
 
+    IGNORE_CHARACTER_NAMES = []
+
     def __init__(self, download_path: str = DOWNLOADS_FOLDER):
         self.cache_path = join(download_path, self.SOURCE_ID, "wiki.pickle.zst")
         self.dump_path = join(download_path, self.SOURCE_ID, "wiki.xml.7z")
@@ -365,7 +367,7 @@ class MediaWiki(Source):
         name: str,
         article: WikiArticle,
     ):
-        return article.namespace == 0
+        return article.namespace == 0 and name not in self.IGNORE_CHARACTER_NAMES
 
     def _all_character_names(self) -> Iterable[str]:
         for title, article in self.articles.items():
