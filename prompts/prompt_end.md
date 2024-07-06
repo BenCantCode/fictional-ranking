@@ -111,7 +111,7 @@ Format this part of your response like so:
 # Ranking (With Names)
 [Number]. [Ability Name] ([Character Name])
 ...
-
+{% if franchise_a == franchise_b %}
 5. If these characters have fought previously, provide a brief summary of how the battle went. Next, reason about whether the results of the battle have any significance on the versions of the characters taking part in this duel. Was the battle a one-on-one duel? Have the characters changed sufficiently for the outcome to be affected?
 
 Format this part of your response like so:
@@ -120,6 +120,8 @@ Format this part of your response like so:
 [Describe one or more prior battles between the two characters. If no prior battles have taken place, write "N/A".]
 
 6. Based solely on the prior battle descriptions, lists of abilities and weaknesses, and abilities ranking, determine which character would be most likely to win in a hypothetical duel. Be realistic. Finalize your response by indicating the result:
-
+{% else %}
+5. Based solely on the lists of abilities and weaknesses and abilities ranking, determine which character would be most likely to win in a hypothetical duel. Be realistic. Finalize your response by indicating the result:
+{% endif %}
 # Winner: [Character Name]
 The winner of the hypothetical duel would be [Character Name]. [Explain how you came to this conclusion.]
