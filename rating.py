@@ -1,6 +1,6 @@
 from choix import ilsr_pairwise_dense
 from character_filter import CharacterFilter
-from config import MODEL_SCALING, DEFAULT_RATING, ALPHA, SCALE_FACTOR
+from config import MAX_TOLERANCE, MODEL_SCALING, DEFAULT_RATING, ALPHA, SCALE_FACTOR
 from match import MatchResult, Outcome
 from character import CharacterId
 import numpy as np
@@ -59,6 +59,7 @@ def rate_characters(
     results: list[MatchResult],
     source_manager: SourceManager,
     model_scaling: dict[str, float] = MODEL_SCALING,
+    max_tolerance: float = MAX_TOLERANCE,
     filter: CharacterFilter | None = None,
 ) -> dict[CharacterId, float]:
     if len(results) == 0:
@@ -72,7 +73,7 @@ def rate_characters(
         ]
     n, id_to_int, int_to_id = _map_characters(results)
     matrix = _results_to_matrix(n, results, id_to_int, model_scaling)
-    raw_rankings = ilsr_pairwise_dense(matrix, alpha=ALPHA)
+    raw_rankings = ilsr_pairwise_dense(matrix, alpha=ALPHA, tol=max_tolerance)
     rankings = dict(
         (int_to_id[i], raw_rankings[i] * SCALE_FACTOR + DEFAULT_RATING)
         for i in range(n)

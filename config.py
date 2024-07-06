@@ -62,7 +62,8 @@ MODEL = "claude-3-haiku-20240307"
 # For rating generation
 DEFAULT_RATING = 1500
 SCALE_FACTOR = 400
-ALPHA = 0.0001  # Regularization parameter.
+ALPHA = 0.000001  # Regularization parameter.
+MAX_TOLERANCE = 0.01  # Detemines when to stop iterating (L1 norm)
 
 # How much to weigh the result of each model.
 MODEL_SCALING = {
