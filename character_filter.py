@@ -219,7 +219,7 @@ class SourceFilter(CharacterFilter):
 
     @property
     def parameters(self):
-        return {"sources": self.source_ids}
+        return {"sources": list(self.source_ids)}
 
     @staticmethod
     def from_parameters(
