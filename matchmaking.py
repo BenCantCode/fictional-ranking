@@ -12,6 +12,8 @@ import json
 from config import DEFAULT_RATING
 from rating import ordinalize_ratings, invert_ratings, rate_characters
 from character_filter import CharacterFilter
+import bisect
+from heapq import merge
 
 MATCHMAKER_TYPE_REGISTRAR = TypeRegistrar["Matchmaker"]()
 
@@ -96,8 +98,42 @@ class RandomMatchmaker(Matchmaker):
 
 @MATCHMAKER_TYPE_REGISTRAR.register("powermatched")
 class PowermatchingMatchmaker(Matchmaker):
-    def __init__(self, ratings: dict[CharacterId, float]):
+    def __init__(
+        self,
+        ratings: dict[CharacterId, float],
+        n: int | None = None,
+        max_rating_difference: int | None = None,
+    ):
         self.ratings = ratings
+        self.n = n
+        self.max_rating_difference = max_rating_difference
+
+    @staticmethod
+    def _find_closest_characters(
+        rating: float,
+        sorted_rated_characters: list[tuple[CharacterId, float]],
+        max_rating_difference: float | None,
+    ) -> Iterable[CharacterId]:
+        if max_rating_difference is not None:
+            min_index = bisect.bisect_left(
+                sorted_rated_characters,
+                rating - max_rating_difference,
+                key=lambda c: c[1],
+            )
+            max_index = bisect.bisect_right(
+                sorted_rated_characters,
+                rating + max_rating_difference,
+                key=lambda c: c[1],
+            )
+            sorted_rated_characters = sorted_rated_characters[min_index:max_index]
+        middle_index = bisect.bisect(
+            sorted_rated_characters, rating, key=lambda c: c[1]
+        )
+        left = sorted_rated_characters[:middle_index]
+        right = sorted_rated_characters[middle_index:]
+        return (
+            c[0] for c in merge(reversed(left), right, key=lambda c: abs(c[1] - rating))
+        )
 
     def generate_matches(
         self,
@@ -106,18 +142,61 @@ class PowermatchingMatchmaker(Matchmaker):
         matches: list[PreparedMatch],
         source_manager: SourceManager,
     ) -> Iterable[tuple[CharacterId, CharacterId]]:
-        for character_id in character_ids:
-            rating = self.ratings.get(character_id, DEFAULT_RATING)
-            distances = sorted(
-                character_ids,
-                key=lambda opponent_id: abs(
-                    rating - self.ratings.get(opponent_id, DEFAULT_RATING)
-                ),
-            )
-            for opponent_id in distances:
-                match = (character_id, opponent_id)
-                if filter.ok(match, matches, source_manager):
-                    yield match
+        sorted_rated_characters = [
+            (character_id, self.ratings.get(character_id, DEFAULT_RATING))
+            for character_id in character_ids
+        ]
+        sorted_rated_characters.sort(key=lambda c: c[1])
+        if self.n is not None:
+            print("num", len(character_ids))
+            print("groups", self.n)
+            grouped_characters = []
+            min_rating = sorted_rated_characters[0][1]
+            max_rating = sorted_rated_characters[-1][1]
+            print("min:", min_rating, "max:", max_rating)
+            rating_group_size = (max_rating - min_rating) / self.n
+            min_group_index = 0
+            grouped_characters = []
+            for i in range(self.n):
+                max_rating = min_rating + ((i + 1) * rating_group_size)
+                if i != self.n - 1:
+                    max_group_index = bisect.bisect_right(
+                        sorted_rated_characters,
+                        min_rating + ((i + 1) * rating_group_size),
+                        key=lambda c: c[1],
+                        lo=min_group_index,
+                    )
+                    unsorted_group = sorted_rated_characters[
+                        min_group_index:max_group_index
+                    ]
+                else:
+                    unsorted_group = sorted_rated_characters[min_group_index:]
+                ideal_group_rating = (
+                    min_rating + (i * rating_group_size) + (rating_group_size / 2)
+                )
+                sorted_group = self._find_closest_characters(
+                    ideal_group_rating, unsorted_group, None
+                )
+                grouped_characters.append(sorted_group)
+                min_group_index = max_group_index
+        else:
+            grouped_characters = [[c] for c in character_ids]
+        # grouped_characters = [list(group) for group in list(grouped_characters)]
+        # print([group[0:10] for group in grouped_characters])
+        for group in grouped_characters:
+            for character_id in group:
+                found = False
+                rating = self.ratings.get(character_id, DEFAULT_RATING)
+                closest_opponents = self._find_closest_characters(
+                    rating, sorted_rated_characters, self.max_rating_difference
+                )
+                for opponent_id in closest_opponents:
+                    match = (character_id, opponent_id)
+                    if filter.ok(match, matches, source_manager):
+                        yield match
+                        found = True
+                        break
+                if found:
                     break
 
     @staticmethod
@@ -128,7 +207,7 @@ class PowermatchingMatchmaker(Matchmaker):
 
     @property
     def parameters(self) -> dict[str, Any]:
-        return {}
+        return {"n": self.n, "max_rating_difference": self.max_rating_difference}
 
 
 @MATCHMAKER_TYPE_REGISTRAR.register("inverted_ordinalized_powermatched")
