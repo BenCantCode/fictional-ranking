@@ -47,6 +47,7 @@
             background-repeat: no-repeat;
             background-size: 80%;
             background-position: center;
+            overflow: hidden;
         }
 
         .character img {
@@ -79,40 +80,18 @@
             margin: 0;
         }
 
-        .tier-S .grade {
-            background: #ff7f7e;
+        {% for grade in tiers.keys() | reverse %}
+        .tier-{{grade | replace('+', 'plus') | replace('-', 'minus')}} .grade {
+            background: hsl({{loop.index0 / loop.length}}turn, 100%, 75%);
         }
-
-        .tier-A .grade {
-            background: #ffbf7f;
-        }
-
-        .tier-B .grade {
-            background: #feff7f;
-        }
-
-        .tier-C .grade {
-            background: #83ff82;
-        }
-
-        .tier-D .grade {
-            background: #7fffff;
-        }
-
-        .tier-E .grade {
-            background: #807fff;
-        }
-
-        .tier-F .grade {
-            background: #8584ff;
-        }
+        {% endfor %}
     </style>
 </head>
 
 <body>
     <div class="tiers">
-        {% for grade, characters in tiers.items() %}
-        <div class="tier tier-{{grade}}">
+        {% for grade, characters in tiers.items() | reverse %}
+        <div class="tier tier-{{grade | replace('+', 'plus') | replace('-', 'minus')}}">
             <h2 class="grade">{{ grade }}</h2>
             <div class="character_list">
                 {% for character in characters %}
