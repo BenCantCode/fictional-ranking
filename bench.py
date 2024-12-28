@@ -10,7 +10,6 @@ import logging
 import toml
 import sys
 import asyncio
-from enum import Enum
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("LiteLLM").setLevel(logging.WARNING)
