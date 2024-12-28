@@ -1,10 +1,18 @@
 # Fictional Character Ranking System
 
-Tier list for every fictional character, generated intelligently using LLMs.
+Tier list of every fictional character, generated intelligently using LLMs.
+
+<br>
+
+<p align="center">
+<img src="screenshot.webp" height=512>
+<br>
+<i>Tier list of several thousand fictional characters. Try zooming in!</i>
+</p>
 
 ## State of Project
 
-This project is largely the result of work performed in the first half of 2024, and therefore does not reflect more recent changes in the AI landscape (e.g. batching and new models). A hosted version of the results can be found on my [blog](https://bengarvin.dev) featuring characters from Marvel and One Piece. If you're interested in the results dataset, feel free to open an issue here explaining your use case.
+This project is largely the result of work performed in the first half of 2024, and therefore does not reflect more recent changes in the AI landscape (e.g. batching and new models). A hosted (and legible) version of the results can be found on my [blog](https://bengarvin.dev) featuring characters from Marvel and One Piece. If you're interested in the results dataset, feel free to open an issue here explaining your use case.
 
 ## Fandom
 
