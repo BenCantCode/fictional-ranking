@@ -16,10 +16,16 @@ from litellm import (
     cost_per_token,
     token_counter,
     Router,
+)
+
+from litellm.exceptions import (
     APIConnectionError,
     RateLimitError,
     BadRequestError,
+    Timeout,
+    InternalServerError,
 )
+
 from os.path import join
 import logging
 from typing import Any, cast, TYPE_CHECKING
@@ -214,7 +220,13 @@ class Evaluator:
                     return await acompletion(
                         model=model, messages=messages, **completion_args
                     )  # type: ignore
-            except (APIConnectionError, RateLimitError, BadRequestError) as e:
+            except (
+                APIConnectionError,
+                RateLimitError,
+                BadRequestError,
+                InternalServerError,
+                Timeout,
+            ) as e:
                 logger.warn("Completion attempt failed: %s", str(e))
                 logger.warn("Retrying...")
                 attempts += 1
