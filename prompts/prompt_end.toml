@@ -1,5 +1,5 @@
 id = "prompt_end"
-version = "0.0.2"
+version = "0.0.3"
 template_file = "prompt_end.md"
 winner_prefix = "# Winner: "
 stop = ["\nThe winner of the hypothetical duel"]
