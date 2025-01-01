@@ -16,7 +16,7 @@ loser = "one_piece/Wapol"
 
 [["One Piece (LD)"]]
 winner = "one_piece/Trafalgar D. Water Law"
-loser = "one_piece/Demalo Black"
+loser = "one_piece/Demaro Black"
 
 [["One Piece (LD)"]]
 winner = "one_piece/Nico Robin"
@@ -41,10 +41,6 @@ loser = "one_piece/Makino"
 [["One Piece (LD)"]]
 winner = "one_piece/Catarina Devon"
 loser = "one_piece/Merry"
-
-[["One Piece (LD)"]]
-winner = "one_piece/Van Augur"
-loser = "one_piece/Charlos"
 
 [["One Piece (LD)"]]
 winner = "one_piece/Van Augur"
