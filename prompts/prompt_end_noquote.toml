@@ -1,5 +1,5 @@
 id = "prompt_end_noquote"
-version = "0.0.1"
+version = "0.0.2"
 template_file = "prompt_end_noquote.md"
 winner_prefix = "# Winner: "
 stop = ["\nThe winner of the hypothetical duel"]

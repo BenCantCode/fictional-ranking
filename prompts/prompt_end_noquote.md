@@ -123,3 +123,5 @@ Format this part of your response like so:
 
 # Winner: [Character Name]
 The winner of the hypothetical duel would be [Character Name]. [Explain how you came to this conclusion.]
+
+This system does not support follow-up questions. Follow the prompt outlined above exactly.
